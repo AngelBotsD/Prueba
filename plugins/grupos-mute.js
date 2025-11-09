@@ -77,42 +77,42 @@ m.chat,
 if (!mutedData[m.chat].includes(user)) return m.reply('⚠️ Ese usuario no está muteado.')
 mutedData[m.chat] = mutedData[m.chat].filter(u => u !== user)
 if (!mutedData[m.chat].length) delete mutedData[m.chat]
-    await saveMutedData()
-    await conn.sendMessage(
-      m.chat,
-      { text: `🔊 *${name}* fue desmuteado.`, mentions: [user] },
-      { quoted: preview }
-    )
-  }
+await saveMutedData()
+await conn.sendMessage(
+m.chat,
+{ text: `🔊 *${name}* fue desmuteado.`, mentions: [user] },
+{ quoted: preview }
+)
+}
 }
 
 handler.before = async (m, { conn, isCommand }) => {
-  if (!m.isGroup || m.fromMe || m.sender === OWNER_LID) return
-  const mutedList = mutedData[m.chat]
-  if (!mutedList || !mutedList.includes(m.sender)) return
-  if (isCommand) return !1
+if (!m.isGroup || m.fromMe || m.sender === OWNER_LID) return
+const mutedList = mutedData[m.chat]
+if (!mutedList || !mutedList.includes(m.sender)) return
+if (isCommand) return !1
 
-  if (!global.deleteQueue) global.deleteQueue = []
-  global.deleteQueue.push({ chat: m.chat, key: m.key, conn })
+if (!global.deleteQueue) global.deleteQueue = []
+global.deleteQueue.push({ chat: m.chat, key: m.key, conn })
 
-  if (!global.deleteProcessing) {
-    global.deleteProcessing = true
-    setImmediate(async function processDeletes() {
-      const queue = global.deleteQueue.splice(0)
-      await Promise.all(queue.map(({ chat, key, conn }) =>
-        conn.sendMessage(chat, { delete: key }).catch(() => {})
-      ))
-      if (global.deleteQueue.length) setImmediate(processDeletes)
-      else global.deleteProcessing = false
-    })
-  }
-  return true
+if (!global.deleteProcessing) {
+global.deleteProcessing = true
+setImmediate(async function processDeletes() {
+const queue = global.deleteQueue.splice(0)
+await Promise.all(queue.map(({ chat, key, conn }) =>
+conn.sendMessage(chat, { delete: key }).catch(() => {})
+))
+if (global.deleteQueue.length) setImmediate(processDeletes)
+else global.deleteProcessing = false
+})
+}
+return true
 }
 
 handler.all = async (m) => {
-  if (!m.isGroup || m.fromMe || m.sender === OWNER_LID) return
-  const mutedList = mutedData[m.chat]
-  if (mutedList && mutedList.includes(m.sender)) return !1
+if (!m.isGroup || m.fromMe || m.sender === OWNER_LID) return
+const mutedList = mutedData[m.chat]
+if (mutedList && mutedList.includes(m.sender)) return !1
 }
 
 handler.help = ['mute @usuario', 'unmute @usuario']
