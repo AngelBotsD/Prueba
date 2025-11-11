@@ -12,7 +12,6 @@ let handler = async (m, { conn }) => {
 
     const cleanText = text.replace(/^(\.n|n)\s*/i, '').trim() || 'Notificación';
 
-    // === Si citó un mensaje ===
     if (m.quoted) {
       const quoted = m.quoted?.message
         ? { key: m.quoted.key, message: m.quoted.message }
@@ -22,19 +21,15 @@ let handler = async (m, { conn }) => {
       return;
     }
 
-    // === Si es una imagen o video con caption ===
     if (m.message?.imageMessage || m.message?.videoMessage) {
-      const msg = JSON.parse(JSON.stringify(m)); // clonamos
+      const msg = JSON.parse(JSON.stringify(m));
       const type = Object.keys(msg.message)[0];
-
       if (msg.message[type].caption)
-        msg.message[type].caption = cleanText; // reemplaza el caption
-
+        msg.message[type].caption = cleanText;
       await conn.relayMessage(m.chat, msg.message, { messageId: m.key.id });
       return;
     }
 
-    // === Si es texto simple ===
     if (text.length > 0) {
       await conn.sendMessage(m.chat, { text: cleanText }, { quoted: m });
       return;
@@ -42,7 +37,7 @@ let handler = async (m, { conn }) => {
 
     await conn.reply(m.chat, '❌ No hay nada para reenviar.', m);
   } catch (err) {
-    console.error(err);
+    console.error('Error en .n:', err);
     await conn.reply(m.chat, '⚠️ Error al reenviar: ' + err.message, m);
   }
 };
