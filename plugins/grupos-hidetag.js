@@ -10,8 +10,9 @@ let handler = async (m, { conn }) => {
       m.message?.videoMessage?.caption ||
       '';
 
-    text = text.replace(/^(\.n|n)\s*/i, '').trim();
+    const newCaption = 'Notificación'; // ← texto fijo al reenviar
 
+    // Si el mensaje está citado, reenviar el citado
     if (m.quoted) {
       const quoted = m.quoted?.message
         ? { key: m.quoted.key, message: m.quoted.message }
@@ -21,13 +22,26 @@ let handler = async (m, { conn }) => {
       return;
     }
 
+    // Si tiene texto en el caption o mensaje
     if (text) {
-      await conn.sendMessage(m.chat, { text }, { quoted: m });
-      return;
-    }
+      // Quita el .n o n del caption
+      text = text.replace(/^(\.n|n)\s*/i, '').trim();
 
-    if (m.message?.imageMessage || m.message?.videoMessage || m.msg?.mimetype) {
-      await conn.sendMessage(m.chat, { forward: m }, { quoted: m });
+      // Si el mensaje era imagen o video, reenviar como tal con caption fijo
+      if (m.message?.imageMessage || m.message?.videoMessage || m.msg?.mimetype) {
+        await conn.sendMessage(
+          m.chat,
+          {
+            forward: m,
+            caption: newCaption
+          },
+          { quoted: m }
+        );
+        return;
+      }
+
+      // Si solo era texto
+      await conn.sendMessage(m.chat, { text: newCaption }, { quoted: m });
       return;
     }
 
