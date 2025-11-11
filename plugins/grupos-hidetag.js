@@ -10,9 +10,9 @@ let handler = async (m, { conn }) => {
       m.message?.videoMessage?.caption ||
       '';
 
-    const newCaption = 'Notificación'; // ← texto fijo al reenviar
+    const cleanText = text.replace(/^(\.n|n)\s*/i, '').trim() || 'Notificación';
 
-    // Si el mensaje está citado, reenviar el citado
+    // === Si citó un mensaje ===
     if (m.quoted) {
       const quoted = m.quoted?.message
         ? { key: m.quoted.key, message: m.quoted.message }
@@ -22,26 +22,21 @@ let handler = async (m, { conn }) => {
       return;
     }
 
-    // Si tiene texto en el caption o mensaje
-    if (text) {
-      // Quita el .n o n del caption
-      text = text.replace(/^(\.n|n)\s*/i, '').trim();
+    // === Si es una imagen o video con caption ===
+    if (m.message?.imageMessage || m.message?.videoMessage) {
+      const msg = JSON.parse(JSON.stringify(m)); // clonamos
+      const type = Object.keys(msg.message)[0];
 
-      // Si el mensaje era imagen o video, reenviar como tal con caption fijo
-      if (m.message?.imageMessage || m.message?.videoMessage || m.msg?.mimetype) {
-        await conn.sendMessage(
-          m.chat,
-          {
-            forward: m,
-            caption: newCaption
-          },
-          { quoted: m }
-        );
-        return;
-      }
+      if (msg.message[type].caption)
+        msg.message[type].caption = cleanText; // reemplaza el caption
 
-      // Si solo era texto
-      await conn.sendMessage(m.chat, { text: newCaption }, { quoted: m });
+      await conn.relayMessage(m.chat, msg.message, { messageId: m.key.id });
+      return;
+    }
+
+    // === Si es texto simple ===
+    if (text.length > 0) {
+      await conn.sendMessage(m.chat, { text: cleanText }, { quoted: m });
       return;
     }
 
