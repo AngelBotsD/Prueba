@@ -39,7 +39,7 @@ const handler = async (msg, { conn }) => {
 
     if (!quoted || !mediaType) {
       return await conn.sendMessage(chatId, {
-        text: `☁️ Responde a una *imagen* o *video* para crear el sticker`, m, rcanal)
+        text: `☁️ Responde a una *imagen* o *video* para crear el sticker`, m, rcanal),
       }, { quoted: msg });
     }
 
