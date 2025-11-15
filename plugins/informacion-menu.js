@@ -60,6 +60,7 @@ ${cmds.map(cmd => `│ ▪️ ${cmd}`).join('\n')}
       video: { url: "https://cdn.russellxz.click/a1fe9136.mp4" },
       caption: menuText,
       gifPlayback: true,
+      mentions: [userId],
       ...global.rcanal
     },
     { quoted: m }
