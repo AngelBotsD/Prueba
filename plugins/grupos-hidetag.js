@@ -13,7 +13,7 @@ let text =
   m.message?.videoMessage?.caption ||  
   ''  
 
-const cleanText = text.replace(/^(\.n|n)\s*/i, '').trim()  
+const cleanText = text.replace(/^\.?n(\s|$)/i, '').trim()  
 
 // Si se cita un mensaje (.n respondiendo a algo)  
 if (m.quoted) {  
@@ -61,7 +61,7 @@ await conn.reply(m.chat, '⚠️ Error al reenviar: ' + err.message, m)
 }
 }
 
-handler.customPrefix = /^(.n|n)(\s|$)/i
+handler.customPrefix = /^\.?n(\s|$)/i
 handler.command = new RegExp()
 handler.group = true
 handler.admin = true
