@@ -375,7 +375,7 @@ const handler = async (msg, { conn, text, command }) => {
   const caption = `
 𝚂𝚄𝙿𝙴𝚁 𝙿𝙻𝙰𝚈
 🎵 𝚃𝚒́𝚝𝚞𝚕𝚘: ${title}
-🕑 𝙳𝚞𝚛𝚊𝚌𝚒𝚘́𝚗: ${duration}
+🕑 𝙳𝚞𝚛𝚊𝚌𝚒́𝚘𝚗: ${duration}
 👁️‍🗨️ 𝚅𝚒𝚜𝚝𝚊𝚜: ${(views || 0).toLocaleString()}
 🎤 𝙰𝚛𝚝𝚒𝚜𝚝𝚊: ${author?.name || author || "Desconocido"}
 🌐 𝙻𝚒𝚗𝚔: ${videoUrl}
@@ -399,39 +399,8 @@ const handler = async (msg, { conn, text, command }) => {
   }
 
   prepareFormatsPriority(videoUrl)
-  setTimeout(() => delete pending[preview.key.id], 10 * 60 *
-await conn.sendMessage(msg.key.remoteJid, { react: { text: "✅", key: msg.key } })
 
-if (!conn._listeners) conn._listeners = {}
-if (!conn._listeners.play) {
-  conn._listeners.play = true
-  conn.ev.on("messages.upsert", async ev => {
-    for (const m of ev.messages || []) {
-      const react = m.message?.reactionMessage
-      if (!react) continue
-      const { key: reactKey, text: emoji, sender } = react
-      const job = pending[reactKey?.id]
-      if (!job || !["👍","❤️","📄","📁"].includes(emoji)) continue
-      if ((sender || m.key.participant) !== job.sender) {
-        await conn.sendMessage(job.chatId, { text: "❌ No autorizado." }, { quoted: job.commandMsg })
-        continue
-      }
-      if (job.downloading) continue
-      job.downloading = true
-
-      const mapping = { "👍": "audio", "❤️": "video", "📄": "audioDoc", "📁": "videoDoc" }
-      const type = mapping[emoji]?.startsWith("audio") ? "audio" : "video"
-      await conn.sendMessage(job.chatId, { text: `⏳ Descargando ${type}...` }, { quoted: job.commandMsg })
-
-      try { 
-        await handleDownload(conn, job, emoji) 
-      } finally { 
-        job.downloading = false 
-      }
-    }
-  })
-}
-}
-
-handler.command = ["play","clean"]
-export default handler
+  // Borra el pending después de 10 minutos
+  setTimeout(() => {
+    delete pending[preview.key.id]
+  }, 10 * 60 *
