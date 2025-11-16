@@ -353,4 +353,6 @@ handler.before = async (msg, { conn }) => {
   handleDownload(conn, job, emoji)
 }
 
+
+handler.command = ["play","clean"]
 export default handler
