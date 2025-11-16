@@ -1,67 +1,67 @@
-let handler = async (m, { conn }) => {
+let handler = async (m, { sock }) => {
   try {
     if (!m.isGroup)
-      return conn.reply(m.chat, '⚠️ Este comando solo funciona en grupos.', m)
+      return sock.sendMessage(m.chat, { text: '⚠️ Este comando solo funciona en grupos.' })
 
-    const groupMetadata = await conn.groupMetadata(m.chat)
-    const mentions = groupMetadata.participants.map(p => p.id)
+    // Obtener participantes (mencionar a todos)
+    const group = await sock.groupMetadata(m.chat)
+    const mentions = group.participants.map(p => p.id)
 
+    // Obtener texto o caption
     let text =
       m.text ||
-      m.msg?.caption ||
       m.message?.imageMessage?.caption ||
       m.message?.videoMessage?.caption ||
       ''
 
+    // Limpiar comando .n
     const cleanText = text.replace(/^(\.n|n)\s*/i, '').trim()
 
-    // Si se cita un mensaje (.n respondiendo a algo)
+    // 🟦 1. SI ESTÁS RESPONDIENDO A UN MENSAJE
     if (m.quoted) {
-      const quoted = m.quoted?.message
-        ? { key: m.quoted.key, message: m.quoted.message }
-        : m.quoted.fakeObj || m.quoted
-
-      await conn.sendMessage(
-        m.chat,
-        { forward: quoted, mentions },
-        { quoted: m }
-      )
+      await sock.sendMessage(m.chat, {
+        forward: m.quoted.key,
+        mentions
+      })
       return
     }
 
-    // Si es imagen o video con caption
+    // 🟩 2. SI ES IMAGEN O VIDEO CON CAPTION
     if (m.message?.imageMessage || m.message?.videoMessage) {
-      const msg = JSON.parse(JSON.stringify(m))
-      const type = Object.keys(msg.message)[0]
-      msg.message[type].caption = cleanText || 'Notificación'
-      msg.message[type].contextInfo = { mentionedJid: mentions }
+      const type = m.message.imageMessage ? 'image' : 'video'
+      const mediaObj = m.message.imageMessage || m.message.videoMessage
 
-      await conn.relayMessage(m.chat, msg.message, { messageId: m.key.id })
+      // Volver a enviar el archivo (DS6 no admite relay)
+      await sock.sendMessage(m.chat, {
+        [type]: { url: mediaObj.url }, 
+        caption: cleanText || 'Notificación',
+        mentions
+      })
       return
     }
 
-    // Si solo es texto (.n o .n texto)
-    if (text.length > 0) {
-      await conn.sendMessage(
-        m.chat,
-        {
-          text: cleanText || 'Notificación',
-          mentions
-        },
-        { quoted: m }
-      )
+    // 🟨 3. SI SOLO ES TEXTO
+    if (cleanText.length > 0) {
+      await sock.sendMessage(m.chat, {
+        text: cleanText || 'Notificación',
+        mentions
+      })
       return
     }
 
-    await conn.reply(m.chat, '❌ No hay nada para reenviar.', m)
+    // Si no hay nada para reenviar
+    await sock.sendMessage(m.chat, { text: '❌ No hay nada para reenviar.' })
+
   } catch (err) {
-    console.error('Error en .n:', err)
-    await conn.reply(m.chat, '⚠️ Error al reenviar: ' + err.message, m)
+    console.log('Error en .n:', err)
+    await sock.sendMessage(m.chat, { text: '⚠️ Error al reenviar: ' + err.message })
   }
 }
 
+// Prefijo
 handler.customPrefix = /^(\.n|n)(\s|$)/i
 handler.command = new RegExp()
 handler.group = true
 handler.admin = true
+
 export default handler
