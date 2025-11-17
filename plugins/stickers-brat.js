@@ -17,7 +17,7 @@ const handler = async (m, { conn, text }) => {
   try {
     await conn.sendMessage(m.chat, { react: { text: "🕒", key: m.key } })
 
-    const url = `https://api.siputzx.my.id/api/m/brat?text=${encodeURIComponent(text)}`
+    const url = `https://canvas-8zhi.onrender.com/api/brat2?texto=${encodeURIComponent(texto)}`
 
     await conn.sendMessage(
       m.chat,
