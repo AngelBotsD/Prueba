@@ -1,46 +1,78 @@
-const handler = async (m, { conn, participants, isAdmin, isOwner }) => {
-  if (!m.isGroup) return;
-  if (!isAdmin && !isOwner) return global.dfail?.('admin', m, conn);
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
+const handler = async (m, { conn }) => {
+  if (!m.isGroup) return m.reply("❌ Este comando solo funciona en grupos.");
+
+  const group = await conn.groupMetadata(m.chat);
+  const participants = group.participants || [];
+
+  // --- MAPA DE BANDERAS POR PAÍS ---
   const flagMap = {
-    "591": "🇧🇴", "593": "🇪🇨", "595": "🇵🇾", "598": "🇺🇾", "507": "🇵🇦",
-    "505": "🇳🇮", "506": "🇨🇷", "502": "🇬🇹", "503": "🇸🇻", "504": "🇭🇳",
-    "509": "🇭🇹", "549": "🇦🇷", "54": "🇦🇷", "55": "🇧🇷", "56": "🇨🇱",
-    "57": "🇨🇴", "58": "🇻🇪", "52": "🇲🇽", "53": "🇨🇺", "51": "🇵🇪",
-    "1": "🇺🇸", "34": "🇪🇸"
+    MX: "🇲🇽",
+    AR: "🇦🇷",
+    CO: "🇨🇴",
+    CL: "🇨🇱",
+    PE: "🇵🇪",
+    VE: "🇻🇪",
+    PA: "🇵🇦",
+    UY: "🇺🇾",
+    PY: "🇵🇾",
+    BO: "🇧🇴",
+    EC: "🇪🇨",
+    GT: "🇬🇹",
+    SV: "🇸🇻",
+    HN: "🇭🇳",
+    NI: "🇳🇮",
+    CR: "🇨🇷",
+    DO: "🇩🇴",
+    PR: "🇵🇷",
+    BR: "🇧🇷",
+    US: "🇺🇸",
+    ES: "🇪🇸",
+
+    // Fallback
+    UNK: "🏳️"
   };
 
-  // Igual que en .pais
-  function getFlag(jid) {
-    const numero = jid.replace(/[^0-9]/g, "");
-    const keys = Object.keys(flagMap).sort((a, b) => b.length - a.length);
-    for (const k of keys) {
-      if (numero.startsWith(k)) return flagMap[k];
+  function getFlagFromJid(jid) {
+    const number = jid.split("@")[0];
+
+    try {
+      const parsed = parsePhoneNumberFromString("+" + number);
+      if (!parsed) return flagMap.UNK;
+
+      const iso = parsed.country || "UNK";
+      return flagMap[iso] || flagMap.UNK;
+    } catch {
+      return flagMap.UNK;
     }
-    return "🌐";
   }
 
-  let texto = `*!  MENCION GENERAL  !*\n`;
-  texto += `   *PARA ${participants.length} MIEMBROS* 🔔\n\n`;
+  // Construcción del mensaje
+  let texto = `📢 *MENCIÓN MASIVA*\n`;
+  texto += `📅 ${new Date().toLocaleString("es-MX")}\n\n`;
 
-  for (const user of participants) {
-    const numero = user.id;
-    const bandera = getFlag(numero);
+  const mentions = [];
 
-    texto += `┊» ${bandera} @${numero.split("@")[0]}\n`;
+  for (const p of participants) {
+    const jid = p.id;
+    const flag = getFlagFromJid(jid);
+    const tag = "@" + jid.split("@")[0];
+
+    mentions.push(jid);
+    texto += `${flag} ${tag}\n`;
   }
 
-  await conn.sendMessage(m.chat, { react: { text: '🔔', key: m.key } });
-
-  await conn.sendMessage(m.chat, {
-    text: texto,
-    mentions: participants.map(p => p.id)
-  }, { quoted: m });
+  // Enviar mensaje
+  await conn.sendMessage(
+    m.chat,
+    {
+      text: texto,
+      mentions
+    },
+    { quoted: m }
+  );
 };
 
-handler.customPrefix = /^\.?(todos)$/i;
-handler.command = new RegExp();
-handler.admin = true;
-handler.group = true;
-
+handler.command = ["todos"];
 export default handler;
