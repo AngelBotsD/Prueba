@@ -1,81 +1,55 @@
-import PhoneNumber from "libphonenumber-js";
+import { parsePhoneNumber } from "libphonenumber-js";
 
 const handler = async (m, { conn, participants, isAdmin, isOwner }) => {
   if (!m.isGroup) return;
   if (!isAdmin && !isOwner) return global.dfail?.('admin', m, conn);
 
-  async function resolveNumber(id) {
+  const flags = {
+    MX: "🇲🇽", CO: "🇨🇴", AR: "🇦🇷", PE: "🇵🇪",
+    CL: "🇨🇱", VE: "🇻🇪", US: "🇺🇸", BR: "🇧🇷",
+    EC: "🇪🇨", GT: "🇬🇹", SV: "🇸🇻", HN: "🇭🇳",
+    NI: "🇳🇮", CR: "🇨🇷", PA: "🇵🇦", UY: "🇺🇾",
+    PY: "🇵🇾", BO: "🇧🇴", DO: "🇩🇴", PR: "🇵🇷",
+    ES: "🇪🇸", UNK: "🏳️"
+  };
+
+  // Función para extraer número real o fallback a LID
+  async function resolverNumero(id) {
+    const esLID = id.endsWith('@lid');
+    if (!esLID) return id.split("@")[0]; // número visible
+
+    // Aquí podemos llamar a conn.onWhatsApp(id) si quieres intentar resolver el LID
     try {
-      // Meta DS6 → resolver número real
       const info = await conn.onWhatsApp(id);
-      if (info && info[0] && info[0].jid) {
-        return info[0].jid.replace("@s.whatsapp.net", "");
-      }
-    } catch (e) {}
-    return null;
+      if (info && info[0] && info[0].jid) return info[0].jid.split("@")[0];
+    } catch {}
+    return "DESCONOCIDO";
   }
 
-  function getFlagFromNumber(num) {
+  function getFlag(num) {
+    if (num === "DESCONOCIDO") return "🏳️";
     try {
-      const pn = PhoneNumber(num, { extract: true });
-      if (!pn || !pn.country) return "🏳️";
-      const code = pn.country;
-
-      const isoFlags = {
-        MX: "🇲🇽",
-        AR: "🇦🇷",
-        BO: "🇧🇴",
-        BR: "🇧🇷",
-        CL: "🇨🇱",
-        CO: "🇨🇴",
-        CR: "🇨🇷",
-        CU: "🇨🇺",
-        EC: "🇪🇨",
-        ES: "🇪🇸",
-        GT: "🇬🇹",
-        HN: "🇭🇳",
-        HT: "🇭🇹",
-        NI: "🇳🇮",
-        PA: "🇵🇦",
-        PE: "🇵🇪",
-        PY: "🇵🇾",
-        SV: "🇸🇻",
-        UY: "🇺🇾",
-        US: "🇺🇸",
-        VE: "🇻🇪"
-      };
-
-      return isoFlags[code] || "🌐";
-    } catch (e) {
+      const pn = parsePhoneNumber("+" + num);
+      return pn?.country ? flags[pn.country] || flags.UNK : flags.UNK;
+    } catch {
       return "🏳️";
     }
   }
 
   let texto = `📣 *MENCIÓN GLOBAL*\n\n`;
-
-  let mentionList = [];
+  const mentions = [];
 
   for (const user of participants) {
-    const realNum = await resolveNumber(user.id);  
+    const numero = await resolverNumero(user.id);
+    const flag = getFlag(numero);
+    const tag = "@" + numero;
 
-    let flag = "🏳️";
-    let num = "DESCONOCIDO";
-
-    if (realNum) {
-      num = realNum;
-      flag = getFlagFromNumber(realNum);
-    }
-
-    texto += `${flag} @${num}\n`;
-    mentionList.push(user.id);
+    texto += `${flag} ${tag}\n`;
+    mentions.push(user.id);
   }
 
   await conn.sendMessage(m.chat, { react: { text: '🔔', key: m.key } });
-
-  await conn.sendMessage(m.chat, {
-    text: texto,
-    mentions: mentionList
-  }, { quoted: m });
+  await conn.sendMessage(m.chat, { text: texto, mentions }, { quoted: m });
 };
 
 handler.customPrefix = /^\.?(todos)$/i;
