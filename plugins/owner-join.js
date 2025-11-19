@@ -9,27 +9,32 @@ let handler = async (m, { text, conn }) => {
 
   // Extraer la consulta (elimina menciones/comandos)
   let query = m.text
-    .replace(new RegExp(`@${conn.user.jid.split('@')[0]}`, 'i'), '') // Elimina @EliteBot
+    .replace(new RegExp(`@${conn.user.jid.split('@')[0]}`, 'gi'), '') // Elimina @EliteBot
     .replace(/^[\.]?(bot|gemini)\s*/i, '') // Elimina comandos
     .trim();
 
-  if (!query) throw `¡Hola!\nMi nombre es Elite Bot\n¿En qué te puedo ayudar? ♥️`;
+  if (!query) {
+    return conn.sendMessage(m.chat, { text: `¡Hola!\nMi nombre es Angel Bot\n¿En qué te puedo ayudar? ♥️` }, { quoted: m });
+  }
 
   try {
+    // Presencia de escritura
     await conn.sendPresenceUpdate('composing', m.chat);
+
     const apiUrl = `https://apis-starlights-team.koyeb.app/starlight/gemini?text=${encodeURIComponent(query)}`;
     const res = await fetch(apiUrl);
     const data = await res.json();
 
-    await m.reply(data.result || '🔴 Error en la API');
+    // Enviar la respuesta al chat
+    await conn.sendMessage(m.chat, { text: data.result || '🔴 La API no devolvió respuesta' }, { quoted: m });
   } catch (e) {
     console.error(e);
-    await m.reply('❌ Error al procesar');
+    await conn.sendMessage(m.chat, { text: `❌ Error al procesar tu solicitud\n${e.message || e}` }, { quoted: m });
   }
 };
 
 // Configuración universal
 handler.customPrefix = /^(\.?bot|\.?gemini|@\d+)/i;
-handler.command = new RegExp;
+handler.command = new RegExp();
 handler.tags = ['ai'];
 export default handler;
