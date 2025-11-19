@@ -1,77 +1,56 @@
-import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { parsePhoneNumber, parsePhoneNumberFromString } from "libphonenumber-js";
 
 const handler = async (m, { conn }) => {
+
   if (!m.isGroup) return m.reply("❌ Este comando solo funciona en grupos.");
 
   const group = await conn.groupMetadata(m.chat);
   const participants = group.participants || [];
 
-  // --- MAPA DE BANDERAS POR PAÍS ---
-  const flagMap = {
-    MX: "🇲🇽",
-    AR: "🇦🇷",
-    CO: "🇨🇴",
-    CL: "🇨🇱",
-    PE: "🇵🇪",
-    VE: "🇻🇪",
-    PA: "🇵🇦",
-    UY: "🇺🇾",
-    PY: "🇵🇾",
-    BO: "🇧🇴",
-    EC: "🇪🇨",
-    GT: "🇬🇹",
-    SV: "🇸🇻",
-    HN: "🇭🇳",
-    NI: "🇳🇮",
-    CR: "🇨🇷",
-    DO: "🇩🇴",
-    PR: "🇵🇷",
-    BR: "🇧🇷",
-    US: "🇺🇸",
-    ES: "🇪🇸",
-
-    // Fallback
-    UNK: "🏳️"
+  const flags = {
+    MX: "🇲🇽", CO: "🇨🇴", AR: "🇦🇷", PE: "🇵🇪",
+    CL: "🇨🇱", VE: "🇻🇪", US: "🇺🇸", BR: "🇧🇷",
+    EC: "🇪🇨", GT: "🇬🇹", SV: "🇸🇻", HN: "🇭🇳",
+    NI: "🇳🇮", CR: "🇨🇷", PA: "🇵🇦", UY: "🇺🇾",
+    PY: "🇵🇾", BO: "🇧🇴", DO: "🇩🇴", PR: "🇵🇷",
+    ES: "🇪🇸", UNK: "🏳️"
   };
 
-  function getFlagFromJid(jid) {
-    const number = jid.split("@")[0];
+  // 🔥 FUNCIÓN QUE SÍ DETECTA EL PAÍS CORRECTAMENTE
+  function getFlag(jid) {
+    let num = jid.split("@")[0];
+
+    // Asegurar que empiece con +
+    if (!num.startsWith("+")) num = "+" + num;
 
     try {
-      const parsed = parsePhoneNumberFromString("+" + number);
-      if (!parsed) return flagMap.UNK;
+      // Intento 1: parseo directo
+      let parsed = parsePhoneNumber(num);
+      if (parsed?.country) return flags[parsed.country] || flags.UNK;
 
-      const iso = parsed.country || "UNK";
-      return flagMap[iso] || flagMap.UNK;
+      // Intento 2: intentar con México por default (Meta lo usa mucho)
+      parsed = parsePhoneNumber(num, "MX");
+      if (parsed?.country) return flags[parsed.country] || flags.UNK;
+
+      return flags.UNK;
     } catch {
-      return flagMap.UNK;
+      return flags.UNK;
     }
   }
 
-  // Construcción del mensaje
-  let texto = `📢 *MENCIÓN MASIVA*\n`;
-  texto += `📅 ${new Date().toLocaleString("es-MX")}\n\n`;
-
+  let texto = `📢 *MENCIÓN GLOBAL*\n\n`;
   const mentions = [];
 
-  for (const p of participants) {
+  for (let p of participants) {
     const jid = p.id;
-    const flag = getFlagFromJid(jid);
+    const flag = getFlag(jid);
     const tag = "@" + jid.split("@")[0];
 
     mentions.push(jid);
     texto += `${flag} ${tag}\n`;
   }
 
-  // Enviar mensaje
-  await conn.sendMessage(
-    m.chat,
-    {
-      text: texto,
-      mentions
-    },
-    { quoted: m }
-  );
+  await conn.sendMessage(m.chat, { text: texto, mentions }, { quoted: m });
 };
 
 handler.command = ["todos"];
