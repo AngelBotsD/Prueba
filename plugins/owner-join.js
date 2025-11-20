@@ -99,7 +99,7 @@ let handler = async (m, { text, conn }) => {
     .trim();
 
   if (!query) {
-    return m.reply(`¡Hola!\nSoy *Elite Bot* 🤖\n¿En qué te ayudo hoy? ❤️`);
+    return m.reply(`¡Hola!\nSoy *Angel Bot* 🤖\n¿En qué te ayudo hoy? ❤️`);
   }
 
   try {
