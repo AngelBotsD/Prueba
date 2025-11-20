@@ -15,7 +15,7 @@ const handler = async (m, { conn }) => {
     const metadata = await conn.groupMetadata(m.chat);
     const groupName = metadata?.subject || "Grupo";
 
-    const link = `*📌 ${groupName}*\nhttps://chat.whatsapp.com/${inviteCode}`;
+    const link = `*${groupName}*\nhttps://chat.whatsapp.com/${inviteCode}`;
 
     let ppBuffer = null;
     try {
