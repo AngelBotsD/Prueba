@@ -17,7 +17,7 @@ const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT) || 3
 const MAX_FILE_MB = Number(process.env.MAX_FILE_MB) || 99
 const DOWNLOAD_TIMEOUT = Number(process.env.DOWNLOAD_TIMEOUT) || 60000
 const MAX_RETRIES = 3
-const PROGRESS_STEP = 0.05 // cada 5%
+const PROGRESS_STEP = 0.05
 
 const pending = {}
 const cache = {}
@@ -157,7 +157,7 @@ async function handleDownload(conn,job,choice){
       const pct = Math.floor(percent*100)
       if(job.lastPct !== pct && pct%10===0){
         job.lastPct = pct
-        conn.sendMessage(job.chatId,{text:`📥 Progreso: ${pct}%`},{quoted:job.commandMsg}).catch(()=>{})
+        console.log(`📥 Descargando ${type}: ${pct}%`)
       }
     })
     cache[id]=cache[id]||{timestamp:Date.now(),files:{}}
