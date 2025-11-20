@@ -12,7 +12,7 @@ const handler = async (m, { conn, participants }) => {
 
   const fkontak = {
     key: { participants: '0@s.whatsapp.net', remoteJid: 'status@broadcast', fromMe: false, id: 'Halo' },
-    message: { locationMessage: { name: '𝖧𝗈𝗅𝖺, 𝖲𝗈𝗒 𝖡𝖺𝗄𝗂-𝖡𝗈𝗍', jpegThumbnail: thumb } },
+    message: { locationMessage: { name: '𝖧𝗈𝗅𝖺, 𝖬𝗎𝖼𝗁𝗈 𝖦𝗎𝗌𝗍𝗈 𝖲𝗈𝗒 𝖠𝗇𝗀𝖾𝗅 𝖡𝗈𝗍', jpegThumbnail: thumb } },
     participant: '0@s.whatsapp.net'
   }
 
