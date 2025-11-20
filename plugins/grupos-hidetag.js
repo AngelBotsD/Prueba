@@ -61,6 +61,8 @@ await conn.reply(m.chat, '⚠️ Error al reenviar: ' + err.message, m)
 }
 }
 
+handler.help = [".𝖭"];
+handler.tags = ["𝖦𝗋𝗎𝗉𝗈𝗌"];
 handler.customPrefix = /^\.?n(\s|$)/i
 handler.command = new RegExp()
 handler.group = true
