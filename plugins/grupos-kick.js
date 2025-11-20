@@ -1,38 +1,32 @@
 const handler = async (m, { conn }) => {
-  // Obtener todos los targets posibles:
-  // - Menciones
-  // - Citado
-  let targets = [];
-
-  if (m.mentionedJid?.length) {
-    targets.push(...m.mentionedJid);
-  }
-
-  if (m.quoted?.sender) {
-    targets.push(m.quoted.sender);
-  }
+  // Juntar todos los posibles objetivos
+  let targets = [
+    ...(m.mentionedJid || []),
+    ...(m.quoted?.sender ? [m.quoted.sender] : [])
+  ];
 
   // Quitar duplicados
   targets = [...new Set(targets)];
 
-  // Si no hubo nada
   if (!targets.length) {
     return conn.sendMessage(
       m.chat,
-      { text: '⚠️ *Menciona o responde al usuario que deseas eliminar.*' },
+      { text: '⚠️ Menciona o responde a quien quieres eliminar.' },
       { quoted: m }
     );
   }
 
   try {
-    // Intentar expulsar uno por uno
-    for (const user of targets) {
-      await conn.groupParticipantsUpdate(m.chat, [user], 'remove');
-    }
+    // Expulsar TODOS al mismo tiempo = máximo rendimiento
+    await Promise.all(
+      targets.map(user =>
+        conn.groupParticipantsUpdate(m.chat, [user], 'remove')
+      )
+    );
 
     await conn.sendMessage(
       m.chat,
-      { text: `✅ *Se eliminaron ${targets.length} usuario(s)*` },
+      { text: `✅ Eliminados: *${targets.length}* usuario(s)` },
       { quoted: m }
     );
 
