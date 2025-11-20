@@ -179,7 +179,7 @@ const handler = async(msg,{conn,text,command})=>{
   }
   if(!text?.trim()) return await conn.sendMessage(msg.key.remoteJid,{text:`✳️ Usa:\n${pref}play <término>\nEj: ${pref}play bad bunny diles`},{quoted:msg})
 
-  try{ await conn.sendMessage(msg.key.remoteJid,{react:{text:"⏳",key:msg.key}}) } catch{}
+  try{ await conn.sendMessage(msg.key.remoteJid,{react:{text:"🕒",key:msg.key}}) } catch{}
   let res
   try{ res = await yts(text) } catch{return await conn.sendMessage(msg.key.remoteJid,{text:"❌ Error al buscar video."},{quoted:msg})}
   const video = res.videos?.[0]
