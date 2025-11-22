@@ -33,6 +33,8 @@ console.error(e);
 }
 };
 
+handler.help = ["𝖣𝖾𝗆𝗈𝗍𝖾"];
+handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"];
 handler.customPrefix = /^\.?demote/i;
 handler.command = new RegExp();
 handler.group = true;
