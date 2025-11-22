@@ -7,9 +7,9 @@
 function cleanJid(jid) {
     if (!jid) return jid;
     return jid
-        .replace(/:.*@/, '@')                 // quitar deviceId (:1@)
-        .replace(/[\s\n\r]+/g, '')            // quitar basura
-        .replace(/@.+/, '@s.whatsapp.net');   // forzar dominio único
+        .replace(/:.*@/, '@')
+        .replace(/[\s\n\r]+/g, '')
+        .replace(/@.+/, '@s.whatsapp.net');
 }
 
 // ---------------------------
@@ -35,24 +35,23 @@ export async function messageHandler(m, { conn }) {
         let sender = cleanJid(m.sender);
         let chat = m.chat;
 
-        // Crear espacio del chat
         if (!global.db.data.chats[chat]) global.db.data.chats[chat] = {};
 
-        // Ignorar si el bot mismo envía mensaje
         if (sender === cleanJid(conn.user.jid)) return;
         if (!m.message) return;
 
-        // Tipos válidos
         const tiposValidos = Object.keys(m.message || {});
         const tipo = tiposValidos.length ? tiposValidos[0] : null;
         if (!tipo) return;
 
-        // Registrar usuario en DB
         if (!global.db.data.users[sender]) global.db.data.users[sender] = { groups: {} };
         let user = global.db.data.users[sender];
 
         if (!user.groups) user.groups = {};
         if (!user.groups[chat]) user.groups[chat] = {};
+
+        // Guardar nombre/nick
+        user.name = m.pushName || user.name || null;
 
         // Guardar actividad
         user.groups[chat].lastMessage = Date.now();
@@ -73,10 +72,8 @@ let handler = async (m, { conn, participants, command }) => {
         const INACTIVIDAD = HORAS * 60 * 60 * 1000;
         const ahora = Date.now();
 
-        // Crear chat si no existe
         if (!global.db.data.chats[m.chat]) global.db.data.chats[m.chat] = {};
 
-        // Obtener participantes
         if (!participants || !Array.isArray(participants)) {
             let metadata = await conn.groupMetadata(m.chat).catch(() => null);
             if (!metadata) return conn.reply(m.chat, "No pude obtener participantes.", m);
@@ -103,33 +100,43 @@ let handler = async (m, { conn, participants, command }) => {
             }
         }
 
-        fantasmas = [...new Set(fantasmas)]; // quitar duplicados
+        fantasmas = [...new Set(fantasmas)];
 
         if (fantasmas.length === 0) {
             return conn.reply(m.chat, "✨ No hay fantasmas en este grupo.", m);
         }
 
+        // Expulsar fantasmas
         if (command === "fankick") {
             try {
                 await conn.groupParticipantsUpdate(m.chat, fantasmas, "remove");
-                return conn.reply(
-                    m.chat,
-                    `🔥 Fantasmas eliminados:\n${fantasmas.map(v => '@' + v.split('@')[0]).join('\n')}`,
-                    null,
-                    { mentions: fantasmas }
-                );
+
+                let msg = fantasmas.map(v => {
+                    let data = global.db.data.users[v];
+                    let nombre = data?.name || v.split('@')[0];
+                    return `🔥 @${nombre}`;
+                }).join('\n');
+
+                return conn.reply(m.chat, `🔥 Fantasmas eliminados:\n${msg}`, null, { mentions: fantasmas });
+
             } catch (e) {
                 return conn.reply(m.chat, "No pude expulsar a algunos participantes.", m);
             }
         }
 
-        // Mostrar lista
+        // Mostrar lista de fantasmas con nombre
+        let lista = fantasmas.map(v => {
+            let data = global.db.data.users[v];
+            let nombre = data?.name || v.split('@')[0];
+            return `👻 @${nombre}`;
+        }).join('\n');
+
         let msg = `
 👻 FANTASMAS DETECTADOS (72H)
 
 Grupo: ${await conn.getName(m.chat)}
 
-${fantasmas.map(v => '👻 @' + v.split('@')[0]).join('\n')}
+${lista}
 
 Usa .fankick para expulsarlos.
 `;
@@ -200,12 +207,18 @@ export function initAutoFantasma(conn) {
                 if (fantasmas.length === 0) continue;
                 fantasmas = [...new Set(fantasmas)];
 
+                let lista = fantasmas.map(v => {
+                    let data = global.db.data.users[v];
+                    let nombre = data?.name || v.split('@')[0];
+                    return `👻 @${nombre}`;
+                }).join('\n');
+
                 let msg = `
 👻 AUTO-REVISIÓN DE FANTASMAS (72H)
 
 Grupo: ${await conn.getName(id)}
 
-${fantasmas.map(v => '👻 @' + v.split('@')[0]).join('\n')}
+${lista}
 `;
 
                 await conn.sendMessage(id, { text: msg, mentions: fantasmas });
