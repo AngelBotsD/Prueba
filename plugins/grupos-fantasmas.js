@@ -1,87 +1,109 @@
-// 📌 REGISTRO DE ACTIVIDAD DE MENSAJES
+// ==========================
+// 📌 REGISTRO DE MENSAJES
+// ==========================
 let messageHandler = async (m, { conn }) => {
-    if (!m.sender || !m.isGroup) return
+    if (!m.isGroup) return
+    if (!m.sender) return
 
-    // Asegura que el usuario existe
-    if (!global.db.data.users[m.sender]) {
-        global.db.data.users[m.sender] = {}
+    // Ignorar mensajes del bot
+    if (m.sender === conn.user.jid) return
+
+    // Ignorar mensajes del sistema que NO cuentan como actividad del usuario
+    const ignorar = [
+        "protocolMessage",
+        "messageContextInfo"
+    ]
+    
+    if (m.message) {
+        let tipo = Object.keys(m.message)[0]
+        if (ignorar.includes(tipo)) return
     }
+
+    // Crear usuario si no existe
+    if (!global.db.data.users[m.sender]) global.db.data.users[m.sender] = {}
 
     let userData = global.db.data.users[m.sender]
 
-    // Asegura que exista 'groups'
+    // Crear objeto de grupos si no existe
     if (!userData.groups) userData.groups = {}
 
-    // Asegura que exista el registro del grupo actual
-    if (!userData.groups[m.chat]) {
-        userData.groups[m.chat] = {}
-    }
+    // Crear registro del grupo si no existe
+    if (!userData.groups[m.chat]) userData.groups[m.chat] = {}
 
-    // 🕒 Guarda la fecha del último mensaje del usuario en este grupo
+    // Registrar última actividad REAL
     userData.groups[m.chat].lastMessage = Date.now()
 
-    // Guarda cambios
     global.db.data.users[m.sender] = userData
 }
 
-// 📌 COMANDO verfantasmas / fankick
+
+
+// ==========================
+// 📌 COMANDO: fantasmas / fankick
+// ==========================
 let handler = async (m, { conn, participants, command }) => {
-    const DIAS_INACTIVO = 3
-    const tiempoInactivo = DIAS_INACTIVO * 24 * 60 * 60 * 1000
+    const DIAS = 3
+    const INACTIVIDAD = DIAS * 24 * 60 * 60 * 1000
     const ahora = Date.now()
 
     let miembros = participants.map(v => v.id)
     let fantasmas = []
-    
+
     for (let usuario of miembros) {
 
-        // ❌ No contar al bot
+        // Ignorar al bot
         if (usuario === conn.user.jid) continue
 
-        // ❌ No contar admins
-        let infoParticipante = participants.find(p => p.id === usuario)
-        let esAdmin = infoParticipante?.admin || infoParticipante?.isAdmin || infoParticipante?.isSuperAdmin
-        if (esAdmin) continue
+        // Ignorar admins
+        let p = participants.find(u => u.id === usuario)
+        if (p?.admin || p?.isAdmin || p?.isSuperAdmin) continue
 
-        // Datos del usuario
         let dataUser = global.db.data.users[usuario]
-        let dataGrupo = dataUser?.groups?.[m.chat]
+        let lastMsg = dataUser?.groups?.[m.chat]?.lastMessage || 0
 
-        let ultimaActividad = dataGrupo?.lastMessage || 0
-
-        // Si lleva más de X días sin hablar
-        if (ahora - ultimaActividad > tiempoInactivo) {
+        if (ahora - lastMsg >= INACTIVIDAD) {
             fantasmas.push(usuario)
         }
     }
 
-    // Si no hay fantasmas
     if (fantasmas.length === 0) {
-        return conn.reply(m.chat, `*[❗INFO❗]* Este grupo no tiene usuarios inactivos.`, m)
+        return conn.reply(m.chat, `*[❗INFO❗]* No hay fantasmas aquí.`, m)
     }
 
-    // Expulsar
+    // 🚮 Si el comando es fankick → eliminar
     if (command === 'fankick') {
         await conn.groupParticipantsUpdate(m.chat, fantasmas, 'remove')
-        let eliminados = fantasmas.map(v => '@' + v.replace(/@.+/, '')).join('\n')
-        return conn.reply(m.chat, `*Fantasmas eliminados:*\n${eliminados}`, null, { mentions: fantasmas })
+
+        return conn.reply(
+            m.chat,
+            `*Fantasmas eliminados:*\n${fantasmas.map(v => '@' + v.split('@')[0]).join('\n')}`,
+            null,
+            { mentions: fantasmas }
+        )
     }
 
-    // Mostrar lista
-    let mensaje = `[ ⚠ 𝙍𝙀𝙑𝙄𝙎𝙄𝙊𝙉 𝙄𝙉𝘼𝘾𝙏𝙄𝙑𝘼 ⚠ ]\n\n`
-    mensaje += `𝐆𝐑𝐔𝐏𝐎: ${await conn.getName(m.chat)}\n`
-    mensaje += `𝐌𝐈𝐄𝐌𝐁𝐑𝐎𝐒: ${miembros.length}\n\n`
-    mensaje += `⇲ 𝙁𝘼𝙉𝙏𝘼𝙎𝙈𝘼𝙎 𝘿𝙀 𝟑 𝘿𝙄𝘼𝙎 ⇱\n`
-    mensaje += fantasmas.map(v => '  👻 @' + v.replace(/@.+/, '')).join('\n')
-    mensaje += `\n\n*_Los usuarios que no hablen serán eliminados_*\n\n`
-    mensaje += `🧹 Para eliminar fantasmas usa:\n.fankick`
+    // 📋 Lista de fantasmas si NO es fankick
+    let mensaje =
+`[ ⚠ 𝙄𝙉𝘼𝘾𝙏𝙄𝙑𝙄𝘿𝘼𝘿 𝘿𝙀 𝟑 𝘿𝙄𝘼𝙎 ⚠ ]
+
+Grupo: ${await conn.getName(m.chat)}
+Miembros: ${miembros.length}
+
+⇲ 𝙁𝘼𝙉𝙏𝘼𝙎𝙈𝘼𝙎 𝙄𝙉𝘼𝘾𝙏𝙄𝙑𝙊𝙎 ⇱
+${fantasmas.map(v => '👻 @' + v.split('@')[0]).join('\n')}
+
+🧹 *Usa .fankick para eliminarlos*`
 
     conn.reply(m.chat, mensaje, null, { mentions: fantasmas })
 }
 
+
+// ==========================
+// 📌 Exportaciones
+// ==========================
 handler.help = ['fantasmas', 'fankick']
 handler.tags = ['group']
-handler.command = /^(verfantasmas|fantasmas|sider|fankick)$/i
+handler.command = /^(fantasmas|verfantasmas|sider|fankick)$/i
 handler.admin = true
 
 export { messageHandler }
