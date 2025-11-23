@@ -22,7 +22,6 @@ function saveCache() { try { fs.writeFileSync(CACHE_FILE, JSON.stringify(cache))
 function loadCache() { try { return JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")) || {} } catch { return {} } }
 function safeUnlink(file) { try { file && fs.existsSync(file) && fs.unlinkSync(file) } catch{} }
 function fileSizeMB(filePath) { try { return fs.statSync(filePath).size / (1024*1024) } catch { return 0 } }
-function wait(ms){ return new Promise(res=>setTimeout(res, ms)) }
 function validCache(file){ return file && fs.existsSync(file) && fileSizeMB(file) > 0 }
 
 async function getSkyApiUrl(videoUrl){
@@ -55,6 +54,9 @@ async function convertToMp3(inputFile){
 async function handlePlay(conn, chatId, text, quoted){
   if(!text?.trim()) return conn.sendMessage(chatId, { text: "✳️ Usa: .play <término>" }, { quoted })
 
+  // Reacción inicial: 🕒
+  await conn.sendMessage(chatId, { react: { text: '🕒', key: quoted.key } })
+
   // Buscar video
   let video
   try{ const res = await yts(text); video = res.videos?.[0] } catch{}
@@ -70,14 +72,17 @@ async function handlePlay(conn, chatId, text, quoted){
   let secs = seconds % 60
   let durationStr = `${mins}:${secs.toString().padStart(2,"0")}`
 
-  // Mensaje tipo Spotify Downloader (solo mm:ss)
-  const infoMsg = `*𝚂𝙿𝙾𝚃𝙸𝙵𝚈 𝙳𝙾𝚆𝙽𝙻𝙾𝙰𝙳𝙴𝚁*\n\n🎵 *𝚃𝚒𝚝𝚞𝚕𝚘:* ${title}\n🎤 *𝙰𝚛𝚝𝚒𝚜𝚝a:* ${artist}\n🕒 *𝙳𝚞𝚛𝚊𝚌𝚒ó𝚗:* ${durationStr}\n🌐 ${videoUrl}`
+  // Mensaje tipo Spotify Downloader (sin link de YouTube)
+  const infoMsg = `*𝚂𝙿𝙾𝚃𝙸𝙵𝚈 𝙳𝙾𝚆𝙽𝙻𝙾𝙰𝙳𝙴𝚁*\n\n🎵 *𝚃𝚒𝚝𝚞𝚕𝚘:* ${title}\n🎤 *𝙰𝚛𝚝𝚒𝚜𝚝a:* ${artist}\n🕒 *𝙳𝚞𝚛𝚊𝚌𝚒ó𝚗:* ${durationStr}`
   await conn.sendMessage(chatId, { image: { url: thumbnail }, caption: infoMsg }, { quoted })
 
   // Revisar cache
   const cached = cache[videoUrl]
   if(cached && validCache(cached)) {
-    return conn.sendMessage(chatId, { audio: fs.readFileSync(cached), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    const sentMsg = await conn.sendMessage(chatId, { audio: fs.readFileSync(cached), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    // Reacción final: ✅
+    await conn.sendMessage(chatId, { react: { text: '✅', key: sentMsg.key } })
+    return
   }
 
   // Descargar audio
@@ -91,7 +96,9 @@ async function handlePlay(conn, chatId, text, quoted){
     if(fileSizeMB(mp3File) > MAX_FILE_MB) throw new Error("Archivo muy grande")
     cache[videoUrl] = mp3File
     saveCache()
-    await conn.sendMessage(chatId, { audio: fs.readFileSync(mp3File), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    const sentMsg = await conn.sendMessage(chatId, { audio: fs.readFileSync(mp3File), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    // Reacción final: ✅
+    await conn.sendMessage(chatId, { react: { text: '✅', key: sentMsg.key } })
   } catch(e){
     safeUnlink(tempFile)
     conn.sendMessage(chatId, { text: `❌ Error al descargar: ${e.message}` }, { quoted })
@@ -100,10 +107,10 @@ async function handlePlay(conn, chatId, text, quoted){
 
 const handler = async (msg, { conn, text, command }) => {
   const chatId = msg.key.remoteJid
-  if(command === "spotify") await handlePlay(conn, chatId, text, msg)
+  if(command === "play") await handlePlay(conn, chatId, text, msg)
 }
 
 handler.help = ["play"]
 handler.tags = ["descargas"]
-handler.command = ["spotify"]
+handler.command = ["play"]
 export default handler
