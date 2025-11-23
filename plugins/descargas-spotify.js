@@ -91,7 +91,7 @@ async function handlePlay(conn, chatId, text, quoted){
 
 const handler = async (msg, { conn, text, command }) => {
   const chatId = msg.key.remoteJid
-  if(command === "play") await handlePlay(conn, chatId, text, msg)
+  if(command === "spotify") await handlePlay(conn, chatId, text, msg)
 }
 
 handler.command = ["spotify"]
