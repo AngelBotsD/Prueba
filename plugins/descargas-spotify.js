@@ -6,6 +6,7 @@ import ffmpeg from "fluent-ffmpeg"
 import { promisify } from "util"
 import { pipeline } from "stream"
 import crypto from "crypto"
+import ytdl from "ytdl-core"
 
 const streamPipe = promisify(pipeline)
 const TMP_DIR = path.join(process.cwd(), "tmp")
@@ -29,13 +30,21 @@ async function getSkyApiUrl(videoUrl){
       headers: { Authorization: `Bearer ${SKY_KEY}` },
       timeout: 20000
     })
-    return data?.data?.audio || data?.audio || data?.url
+    return data?.data?.audio || data?.audio || data?.url || null
   } catch { return null }
 }
 
 async function downloadFile(url, outPath){
   const res = await axios.get(url, { responseType: "stream", timeout: 60000 })
   await streamPipe(res.data, fs.createWriteStream(outPath))
+  if(!fs.existsSync(outPath) || fileSizeMB(outPath) === 0) throw new Error("Archivo descargado vacío")
+  return outPath
+}
+
+async function downloadFallback(videoUrl, outPath){
+  const stream = ytdl(videoUrl, { filter: "audioonly", quality: "highestaudio" })
+  await streamPipe(stream, fs.createWriteStream(outPath))
+  if(!fs.existsSync(outPath) || fileSizeMB(outPath) === 0) throw new Error("Fallback fallido")
   return outPath
 }
 
@@ -65,35 +74,41 @@ async function handlePlay(conn, chatId, text, quoted){
   const { url: videoUrl, title, thumbnail, duration, author } = video
   const artist = author?.name || "Desconocido"
 
-  // Mensaje tipo Spotify Downloader
-  const infoMsg = `*𝚂𝙿𝙾𝚃𝙸𝙵𝚈 𝙳𝙾𝚆𝙽𝙻𝙾𝙰𝙳𝙴𝚁*\n\n🎵 *𝚃𝚒𝚝𝚞𝚕𝚘:* ${title}\n🎤 *𝙰𝚛𝚝𝚒𝚜𝚝\a:* ${artist}\n🕒 *𝙳𝚞𝚛𝚊𝚌𝚒ó𝚗:* ${duration}`
+  // Mostrar info inmediatamente
+  const infoMsg = `*𝚂𝙿𝙾𝚃𝙸𝙵𝚈 𝙳𝙾𝚆𝙽𝙻𝙾𝙰𝙳𝙴𝚁*\n\n🎵 *𝚃𝚒𝚝𝚞𝚕\o:* ${title}\n🎤 *𝙰𝚛𝚝\i\s\t\a:* ${artist}\n🕒 *𝙳𝚞\♧\r\a\c\i\ó\♧:* ${duration}`
   await conn.sendMessage(chatId, { image: { url: thumbnail }, caption: infoMsg }, { quoted })
 
-  // Revisar cache
+  // Enviar desde cache si existe
   const cached = cache[videoUrl]
   if(cached && fs.existsSync(cached)) {
     return conn.sendMessage(chatId, { audio: fs.createReadStream(cached), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
   }
 
-  // Descargar audio
-  const mediaUrl = await getSkyApiUrl(videoUrl)
-  if(!mediaUrl) return conn.sendMessage(chatId, { text: "❌ No se pudo obtener el audio." }, { quoted })
+  // Descargar en segundo plano
+  (async () => {
+    const tempFile = path.join(TMP_DIR, `${crypto.randomUUID()}.tmp`)
+    try{
+      // Primero intentar Sky API
+      let mediaUrl = await getSkyApiUrl(videoUrl)
+      if(mediaUrl){
+        await downloadFile(mediaUrl, tempFile)
+      } else {
+        // Fallback a ytdl-core
+        await downloadFallback(videoUrl, tempFile)
+      }
 
-  const tempFile = path.join(TMP_DIR, `${crypto.randomUUID()}.tmp`)
-  try{
-    await downloadFile(mediaUrl, tempFile)
+      const mp3File = await convertToMp3(tempFile)
+      if(fileSizeMB(mp3File) > MAX_FILE_MB) throw new Error("Archivo muy grande")
 
-    const mp3File = await convertToMp3(tempFile)
+      cache[videoUrl] = mp3File
+      saveCache()
 
-    if(fileSizeMB(mp3File) > MAX_FILE_MB) throw new Error("Archivo muy grande")
-    cache[videoUrl] = mp3File
-    saveCache()
-
-    await conn.sendMessage(chatId, { audio: fs.createReadStream(mp3File), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
-  } catch(e){
-    safeUnlink(tempFile)
-    conn.sendMessage(chatId, { text: `❌ Error al descargar: ${e.message}` }, { quoted })
-  }
+      await conn.sendMessage(chatId, { audio: fs.createReadStream(mp3File), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    } catch(e){
+      safeUnlink(tempFile)
+      conn.sendMessage(chatId, { text: `❌ Error al descargar: ${e.message}` }, { quoted })
+    }
+  })()
 }
 
 const handler = async (msg, { conn, text, command }) => {
