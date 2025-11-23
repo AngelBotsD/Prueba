@@ -137,7 +137,7 @@ Elige cómo enviarlo:
 ✦ 𝗗𝘂𝗿𝗮𝗰𝗶𝗼́𝗻: ${durationTxt}
 ✦ 𝗦𝗼𝘂𝗿𝗰𝗲: api-sky.ultraplus.click
 ────────────
-🤖 𝙎𝙪𝙠𝙞 𝘽𝙤𝙩`;
+`;
 
     let preview;
     if (thumb) {
