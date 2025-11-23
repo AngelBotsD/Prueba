@@ -10,13 +10,13 @@ export async function participantsUpdate({ id, participants, action }, { conn })
 
   const chat = global.db.data.chats[id] || {};
 
-  // Si el antiarabes está apagado → no hacer nada
   if (!chat.antiArabes) return;
 
   for (let user of participants) {
     const number = user.split("@")[0];
 
-    const prefix = number.slice(0, number.length - 7);
+    // Ahora sí detecta el prefijo REAL
+    const prefix = number.slice(0, 3);
 
     if (arabes.includes(prefix)) {
       try {
