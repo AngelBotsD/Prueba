@@ -33,8 +33,10 @@ const handler = async (msg, { conn }) => {
   })
 }
 
+
+handler.help = ["𝖬𝗒𝗅𝗂𝖽"]
+handler.tags = ["𝖮𝖶𝖭𝖤𝖱"]
 handler.command = ['lid', 'mylid']
 handler.group = true
-handler.private = false
-
+handler.rowner = true
 export default handler
