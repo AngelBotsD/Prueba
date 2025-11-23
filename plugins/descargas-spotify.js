@@ -1,74 +1,45 @@
 import fetch from 'node-fetch';
+import axios from 'axios';
 
-const handler = async (msg, { conn, args, command }) => {
-  const chatId = msg.key.remoteJid;
-  const text = args.join(" ");
-  const pref = global.prefixes?.[0] || ".";
+const apis = {
+  search: 'https://delirius-apiofc.vercel.app/search/spotify',
+  download: 'https://api.delirius.store/download/spotifydl'
+};
 
-  if (!text) {
-    return conn.sendMessage(chatId, {
-      text: `⚠️ *Uso incorrecto del comando.*\n\n📌 *Ejemplo:* ${pref}${command} https://open.spotify.com/track/3NDEO1QeVlxskfRHHGm7KS`
-    }, { quoted: msg });
-  }
-
-  if (!/^https?:\/\/(www\.)?open\.spotify\.com\/track\//.test(text)) {
-    return conn.sendMessage(chatId, {
-      text: `⚠️ *Enlace no válido.*\n\n📌 Asegúrate de ingresar una URL de Spotify válida.\n\nEjemplo:\n${pref}${command} https://open.spotify.com/track/3NDEO1QeVlxskfRHHGm7KS`
-    }, { quoted: msg });
-  }
-
-  await conn.sendMessage(chatId, {
-    react: { text: '⏳', key: msg.key }
-  });
+const handler = async (m, { conn, args, text }) => {
+  if (!text) return m.reply(`*💽 Ingresa el nombre de alguna canción en Spotify*`);
 
   try {
-    const apiUrl = `https://api.neoxr.eu/api/spotify?url=${encodeURIComponent(text)}&apikey=Neveloopp`;
-    const response = await fetch(apiUrl);
-    if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+    // Reacción de "procesando"
+    await conn.sendMessage(m.chat, { react: { text: '🕒', key: m.key }});
 
-    const data = await response.json();  
-    if (!data.status || !data.data || !data.data.url) throw new Error("No se pudo obtener el enlace de descarga.");  
+    // Buscar canción
+    const { data } = await axios.get(`${apis.search}?q=${encodeURIComponent(text)}&limit=10`);
+    if (!data.data || data.data.length === 0) {
+      throw `_*[ ⚠️ ] No se encontraron resultados para "${text}" en Spotify.*_`;
+    }
 
-    const song = data.data;  
-    const caption =  
-      `𖠁 *Título:* ${song.title}\n` +  
-      `𖠁 *Artista:* ${song.artist.name}\n` +  
-      `𖠁 *Duración:* ${song.duration}\n` +  
-      `𖠁 *Enlace:* ${song.url}\n\n────────────\n🎧 _La Suki Bot_`;  
+    const song = data.data[0];
+    const img = song.image;
+    const info = `> *SPOTIFY DOWNLOADER*\n\n🎵 *Título:* ${song.title}\n🎤 *Artista:* ${song.artist}\n🕒 *Duración:* ${song.duration}`;
 
-    // Enviar miniatura con información  
-    await conn.sendMessage(chatId, {  
-      image: { url: song.thumbnail },  
-      caption,  
-      mimetype: 'image/jpeg'  
-    }, { quoted: msg });  
+    // Enviar info e imagen
+    await conn.sendFile(m.chat, img, 'imagen.jpg', info, m);
 
-    // Descargar audio y enviar  
-    const audioRes = await fetch(song.url);  
-    if (!audioRes.ok) throw new Error("No se pudo descargar el audio.");  
+    // Descargar usando la nueva API
+    const downloadUrl = `${apis.download}?url=${encodeURIComponent(song.url)}`;
+    await conn.sendMessage(m.chat, { audio: { url: downloadUrl }, fileName: 'audio.mp3', mimetype: 'audio/mpeg', quoted: m });
 
-    const audioBuffer = await audioRes.arrayBuffer(); // en ESM usamos arrayBuffer y luego Buffer
-    await conn.sendMessage(chatId, {  
-      audio: Buffer.from(audioBuffer),  
-      mimetype: 'audio/mpeg',  
-      fileName: `${song.title}.mp3`  
-    }, { quoted: msg });  
+    // Reacción de "listo"
+    await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key }});
 
-    await conn.sendMessage(chatId, {  
-      react: { text: '✅', key: msg.key }  
-    });
-
-  } catch (err) {
-    console.error("❌ Error en .spotify:", err);
-    await conn.sendMessage(chatId, {
-      text: `❌ *Error al procesar Spotify:*\n_${err.message}_`
-    }, { quoted: msg });
-
-    await conn.sendMessage(chatId, {  
-      react: { text: '❌', key: msg.key }  
-    });
+  } catch (e) {
+    await conn.reply(m.chat, `❌ Ocurrió un error, intenta nuevamente.`, m);
+    console.log(e);
   }
 };
 
-handler.command = ["spotify"];
+handler.tags = ['downloader']; 
+handler.help = ['spotify'];
+handler.command = ['spotify'];
 export default handler;
