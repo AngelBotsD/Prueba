@@ -54,7 +54,7 @@ async function convertToMp3(inputFile){
 async function handlePlay(conn, chatId, text, quoted){
   if(!text?.trim()) return conn.sendMessage(chatId, { text: "✳️ Usa: .play <término>" }, { quoted })
 
-  // Reacción inicial: 🕒
+  // Reacción inicial al mensaje del usuario 🕒
   await conn.sendMessage(chatId, { react: { text: '🕒', key: quoted.key } })
 
   // Buscar video
@@ -64,7 +64,7 @@ async function handlePlay(conn, chatId, text, quoted){
 
   const { url: videoUrl, title, thumbnail, seconds } = video
 
-  // Extraer artista (simple: todo antes del '-' es artista)
+  // Extraer artista
   let artist = title.includes(" - ") ? title.split(" - ")[0].trim() : "Desconocido"
   
   // Formato duración mm:ss
@@ -79,9 +79,9 @@ async function handlePlay(conn, chatId, text, quoted){
   // Revisar cache
   const cached = cache[videoUrl]
   if(cached && validCache(cached)) {
-    const sentMsg = await conn.sendMessage(chatId, { audio: fs.readFileSync(cached), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
-    // Reacción final: ✅
-    await conn.sendMessage(chatId, { react: { text: '✅', key: sentMsg.key } })
+    await conn.sendMessage(chatId, { audio: fs.readFileSync(cached), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    // Reacción final al mensaje del usuario ✅
+    await conn.sendMessage(chatId, { react: { text: '✅', key: quoted.key } })
     return
   }
 
@@ -96,9 +96,9 @@ async function handlePlay(conn, chatId, text, quoted){
     if(fileSizeMB(mp3File) > MAX_FILE_MB) throw new Error("Archivo muy grande")
     cache[videoUrl] = mp3File
     saveCache()
-    const sentMsg = await conn.sendMessage(chatId, { audio: fs.readFileSync(mp3File), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
-    // Reacción final: ✅
-    await conn.sendMessage(chatId, { react: { text: '✅', key: sentMsg.key } })
+    await conn.sendMessage(chatId, { audio: fs.readFileSync(mp3File), mimetype: "audio/mpeg", fileName: `${title}.mp3` }, { quoted })
+    // Reacción final al mensaje del usuario ✅
+    await conn.sendMessage(chatId, { react: { text: '✅', key: quoted.key } })
   } catch(e){
     safeUnlink(tempFile)
     conn.sendMessage(chatId, { text: `❌ Error al descargar: ${e.message}` }, { quoted })
