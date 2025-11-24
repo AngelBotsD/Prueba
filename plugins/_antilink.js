@@ -1,9 +1,28 @@
+const urlRegex = /\b((https?:\/\/|www\.)[^\s/$.?#].[^\s]*)/gi;
+
+const allowedDomains = [
+  'instagram.com',
+  'www.instagram.com',
+  'ig.me'
+];
+
+const shorteners = [
+  'bit.ly',
+  'tinyurl.com',
+  't.co',
+  'shorturl.at',
+  'goo.gl',
+  'rebrand.ly',
+  'is.gd',
+  'cutt.ly',
+  'linktr.ee',
+  'shrtco.de'
+];
+
 export async function before(m, { conn, isAdmin }) {
 
-  // 🛑 IGNORAR SI EL MENSAJE LO MANDÓ EL BOT, SIEMPRE
-  if (m.id.startsWith(conn.user.jid)) return true
-  if (m.fromMe) return true
-  if (m.isBaileys) return true
+  // 🚫 IGNORAR MENSAJES DEL BOT PARA QUE NO SE AUTO-DETECTE
+  if (m.fromMe || m.id?.startsWith(conn.user.jid) || m.isBaileys) return true;
 
   if (!m.isGroup) return false;
 
@@ -22,6 +41,7 @@ export async function before(m, { conn, isAdmin }) {
 
     for (let link of links) {
       const lower = link.toLowerCase();
+
       if (
         lower.includes(normalizedGroupLink) ||
         allowedDomains.some(domain => lower.includes(domain))
