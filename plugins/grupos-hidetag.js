@@ -2,108 +2,115 @@ import { generateWAMessageFromContent, downloadContentFromMessage } from '@whisk
 import fetch from 'node-fetch'
 
 let thumb = null
-fetch('https://cdn.russellxz.click/28a8569f.jpeg')
-  .then(r => r.arrayBuffer())
-  .then(buf => thumb = Buffer.from(buf))
-  .catch(() => null)
 
-function unwrapMessage(m = {}) {
-  let n = m
-  while (
-    n?.viewOnceMessage?.message ||
-    n?.viewOnceMessageV2?.message ||
-    n?.viewOnceMessageV2Extension?.message ||
-    n?.ephemeralMessage?.message
-  ) {
-    n =
-      n.viewOnceMessage?.message ||
-      n.viewOnceMessageV2?.message ||
-      n.viewOnceMessageV2Extension?.message ||
-      n.ephemeralMessage?.message
+async function loadThumb() {
+  if (thumb) return thumb
+  try {
+    const r = await fetch('https://cdn.russellxz.click/28a8569f.jpeg')
+    thumb = Buffer.from(await r.arrayBuffer())
+  } catch {
+    thumb = null
   }
-  return n
+  return thumb
 }
 
-function getMessageText(m) {
-  const msg = unwrapMessage(m.message) || {}
-  return (
-    m.text ||
-    m.msg?.caption ||
-    msg?.extendedTextMessage?.text ||
-    msg?.conversation ||
-    ''
-  )
+function unwrapMessage(m = {}) {
+  try {
+    let n = m
+    while (
+      n?.viewOnceMessage?.message ||
+      n?.viewOnceMessageV2?.message ||
+      n?.viewOnceMessageV2Extension?.message ||
+      n?.ephemeralMessage?.message
+    ) {
+      n =
+        n.viewOnceMessage?.message ||
+        n.viewOnceMessageV2?.message ||
+        n.viewOnceMessageV2Extension?.message ||
+        n.ephemeralMessage?.message
+    }
+    return n || {}
+  } catch {
+    return {}
+  }
+}
+
+function getMessageText(m = {}) {
+  try {
+    const msg = unwrapMessage(m.message)
+    return (
+      m.text ||
+      m.msg?.caption ||
+      msg?.extendedTextMessage?.text ||
+      msg?.conversation ||
+      ''
+    )
+  } catch {
+    return ''
+  }
 }
 
 async function downloadMedia(msgContent, type) {
   try {
+    if (!msgContent || !type) return null
     const stream = await downloadContentFromMessage(msgContent, type)
-    let buffer = Buffer.alloc(0)
-    for await (const c of stream) buffer = Buffer.concat([buffer, c])
-    return buffer
+    const chunks = []
+    for await (const c of stream) chunks.push(c)
+    return Buffer.concat(chunks)
   } catch {
     return null
   }
 }
 
 const handler = async (m, { conn, participants }) => {
-  if (!m.isGroup || m.key.fromMe) return
-
-  const fkontak = {
-    key: {
-      participants: '0@s.whatsapp.net',
-      remoteJid: 'status@broadcast',
-      fromMe: false,
-      id: 'Angel'
-    },
-    message: {
-      locationMessage: {
-        name: '𝖧𝗈𝗅𝖺, 𝖲𝗈𝗒 𝖠𝗇𝗀𝖾𝗅 𝖡𝗈𝗍',
-        jpegThumbnail: thumb
-      }
-    },
-    participant: '0@s.whatsapp.net'
-  }
-
-  const content = getMessageText(m)
-  if (!/^\.?n(\s|$)/i.test(content.trim())) return
-
-  await conn.sendMessage(m.chat, { react: { text: '🗣️', key: m.key } })
-
-  const seen = new Set()
-  const users = []
-  for (const p of participants) {
-    const jid = conn.decodeJid(p.id)
-    if (!seen.has(jid)) {
-      seen.add(jid)
-      users.push(jid)
-    }
-  }
-
-  const q = m.quoted ? unwrapMessage(m.quoted) : unwrapMessage(m)
-  const mtype = q.mtype || Object.keys(q.message || {})[0] || ''
-
-  const isMedia = [
-    'imageMessage',
-    'videoMessage',
-    'audioMessage',
-    'stickerMessage'
-  ].includes(mtype)
-
-  const userText = content.trim().replace(/^\.?n(\s|$)/i, '')
-  const originalCaption = (q.msg?.caption || q.text || '').trim()
-  const finalCaption = userText || originalCaption || '🔊 Notificación'
-
   try {
+    if (!m || !m.isGroup || m.key?.fromMe) return
+
+    await loadThumb()
+
+    const fkontak = {
+      key: {
+        participants: '0@s.whatsapp.net',
+        remoteJid: 'status@broadcast',
+        fromMe: false,
+        id: 'Angel'
+      },
+      message: {
+        locationMessage: {
+          name: '𝖧𝗈𝗅𝖺, 𝖲𝗈𝗒 𝖠𝗇𝗀𝖾𝗅 𝖡𝗈𝗍',
+          jpegThumbnail: thumb
+        }
+      },
+      participant: '0@s.whatsapp.net'
+    }
+
+    const content = getMessageText(m)
+    if (!/^\.?n(\s|$)/i.test(content?.trim?.() || '')) return
+
+    await conn.sendMessage(m.chat, { react: { text: '🗣️', key: m.key } })
+
+    const users = [...new Set((participants || []).map(p => conn.decodeJid(p.id)))]
+
+    const quotedRaw = m.quoted || {}
+    const q = unwrapMessage(quotedRaw)
+    const mtype = q?.mtype || Object.keys(q?.message || {})[0] || ''
+    const isMedia = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage'].includes(mtype)
+
+    const userText = (content || '').trim().replace(/^\.?n(\s|$)/i, '')
+    const originalCaption = (q?.msg?.caption || q?.text || '').trim?.() || ''
+    const finalCaption = userText || originalCaption || '🔊 Notificación'
+
     if (isMedia) {
       let buffer = null
-
-      if (q[mtype]) {
-        const det = mtype.replace('Message', '').toLowerCase()
-        buffer = await downloadMedia(q[mtype], det)
+      try {
+        if (q[mtype]) {
+          const det = mtype.replace('Message', '').toLowerCase()
+          buffer = await downloadMedia(q[mtype], det)
+        }
+        if (!buffer && q.download) buffer = await q.download()
+      } catch {
+        buffer = null
       }
-
-      if (!buffer) buffer = await q.download()
 
       const msg = { mentions: users }
 
@@ -111,9 +118,7 @@ const handler = async (m, { conn, participants }) => {
         msg.audio = buffer
         msg.mimetype = 'audio/mpeg'
         msg.ptt = false
-
         await conn.sendMessage(m.chat, msg, { quoted: fkontak })
-
         if (userText) {
           await conn.sendMessage(
             m.chat,
@@ -121,7 +126,6 @@ const handler = async (m, { conn, participants }) => {
             { quoted: fkontak }
           )
         }
-
         return
       }
 
@@ -140,22 +144,38 @@ const handler = async (m, { conn, participants }) => {
     }
 
     if (m.quoted && !isMedia) {
-      const newMsg = conn.cMod(
-        m.chat,
-        generateWAMessageFromContent(
+      let safeMessage = null
+      try {
+        safeMessage = q?.message?.[mtype] || { text: finalCaption }
+      } catch {
+        safeMessage = { text: finalCaption }
+      }
+
+      let newMsg = null
+      try {
+        newMsg = conn.cMod(
           m.chat,
-          { [mtype || 'extendedTextMessage']: q?.message?.[mtype] || { text: finalCaption } },
-          { quoted: fkontak, userJid: conn.user.id }
-        ),
-        finalCaption,
-        conn.user.jid,
-        { mentions: users }
-      )
+          generateWAMessageFromContent(
+            m.chat,
+            { [mtype || 'extendedTextMessage']: safeMessage },
+            { quoted: fkontak, userJid: conn.user.id }
+          ),
+          finalCaption,
+          conn.user.jid,
+          { mentions: users }
+        )
+      } catch {
+        return await conn.sendMessage(
+          m.chat,
+          { text: finalCaption, mentions: users },
+          { quoted: fkontak }
+        )
+      }
 
       return await conn.relayMessage(
         m.chat,
-        newMsg.message,
-        { messageId: newMsg.key.id }
+        newMsg?.message,
+        { messageId: newMsg?.key?.id }
       )
     }
 
