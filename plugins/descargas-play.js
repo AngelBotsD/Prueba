@@ -250,7 +250,7 @@ const pending = {}
 function pendingManagerAdd(id, data){ pending[id]=data; setTimeout(()=>delete pending[id],10*60*1000) }
 function pendingManagerGet(id){ return pending[id] }
 
-handler.help = ["𝖯𝗅𝖺𝗒"]
+handler.help = ["𝖯𝗅𝖺𝗒 <𝖳𝖾𝗑𝗍𝗈>"]
 handler.tags = ["𝖣𝖤𝖲𝖢𝖠𝖱𝖦𝖠𝖲"]
 handler.command = ["play","clean"]
 export default handler
