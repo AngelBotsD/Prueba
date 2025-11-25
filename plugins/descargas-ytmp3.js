@@ -202,7 +202,7 @@ Elige cómo enviarlo:
 };
 
 handler.command  = ["ytmp3","yta"];
-handler.help     = ["ytmp3 <url>", "yta <url>"];
-handler.tags     = ["descargas"];
+handler.help     = ["𝖸𝗍𝗆𝗉3 <𝖴𝗋𝗅>"];
+handler.tags     = ["𝖣𝖤𝖲𝖢𝖠𝖱𝖦𝖠𝖲"];
 
 export default handler;
