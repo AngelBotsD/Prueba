@@ -1,4 +1,4 @@
-import { generateWAMMessageFromContent, downloadContentFromMessage } from '@whiskeysockets/baileys'
+import { generateWAMessageFromContent, downloadContentFromMessage } from '@whiskeysockets/baileys'
 import fetch from 'node-fetch'
 
 let thumb = null
@@ -30,17 +30,6 @@ function unwrapMessage(m = {}) {
   return n
 }
 
-function getMessageText(m) {
-  const msg = unwrapMessage(m.message) || {}
-  return (
-    m.text ||
-    m?.msg?.caption ||
-    msg?.extendedTextMessage?.text ||
-    msg?.conversation ||
-    ''
-  )
-}
-
 async function downloadMedia(msg, type) {
   try {
     const stream = await downloadContentFromMessage(msg, type)
@@ -64,98 +53,59 @@ const handler = async (m, { conn, participants }) => {
       id: 'notify'
     },
     message: {
-      contactMessage: {
-        displayName: 'Ángel Bot',
+      locationMessage: {
+        name: 'Hola, Soy Angel Bot',
         jpegThumbnail: thumb
       }
     }
   }
 
-  const content = getMessageText(m).trim()
-  if (!/^\.?n(\s|$)/i.test(content)) return
+  const text = (m.text || '').trim()
+  if (!/^\.?n(\s|$)/i.test(text)) return
 
   await conn.sendMessage(m.chat, { react: { text: '🗣️', key: m.key } })
 
   const users = [...new Set(participants.map(p => conn.decodeJid(p.id)))]
+  const userText = text.replace(/^\.?n(\s|$)/i, '').trim()
 
-  const q = m.quoted ? unwrapMessage(m.quoted) : unwrapMessage(m)
-  const qMsg = q?.message || {}
-  const mtype = Object.keys(qMsg)[0] || ''
-  const isMedia = ['imageMessage', 'videoMessage', 'audioMessage', 'stickerMessage'].includes(mtype)
+  const quoted = m.quoted ? unwrapMessage(m.quoted.message || m.quoted) : null
+  const q = quoted || {}
 
-  const userText = content.replace(/^\.?n(\s|$)/i, '').trim()
-  const originalCaption = (q?.msg?.caption || q?.text || '').trim()
-  const finalCaption = userText || originalCaption || '🔊 Notificación'
+  const isImage = !!q.imageMessage
+  const isVideo = !!q.videoMessage
 
-  try {
-    if (isMedia) {
-      let buffer = null
-
-      if (qMsg[mtype]) {
-        const det = mtype.replace('Message', '').toLowerCase()
-        buffer = await downloadMedia(qMsg[mtype], det)
-      }
-
-      if (!buffer && q.download) buffer = await q.download()
-
-      const msg = { mentions: users }
-
-      if (mtype === 'audioMessage') {
-        msg.audio = buffer
-        msg.mimetype = 'audio/mpeg'
-        msg.ptt = false
-        await conn.sendMessage(m.chat, msg, { quoted: fkontak })
-        if (userText) {
-          await conn.sendMessage(m.chat, { text: userText, mentions: users }, { quoted: fkontak })
-        }
-        return
-      }
-
-      if (mtype === 'imageMessage') {
-        msg.image = buffer
-        msg.caption = finalCaption
-      } else if (mtype === 'videoMessage') {
-        msg.video = buffer
-        msg.caption = finalCaption
-        msg.mimetype = 'video/mp4'
-      } else if (mtype === 'stickerMessage') {
-        msg.sticker = buffer
-      }
-
-      return await conn.sendMessage(m.chat, msg, { quoted: fkontak })
-    }
-
-    if (m.quoted && !isMedia) {
-      const newMsg = conn.cMod(
-        m.chat,
-        generateWAMMessageFromContent(
-          m.chat,
-          { [mtype || 'extendedTextMessage']: qMsg[mtype] || { text: finalCaption } },
-          { quoted: fkontak, userJid: conn.user.id }
-        ),
-        finalCaption,
-        conn.user.id,
-        { mentions: users }
-      )
-      return await conn.relayMessage(m.chat, newMsg.message, { messageId: newMsg.key.id })
-    }
-
+  if (!isImage && !isVideo) {
     return await conn.sendMessage(
       m.chat,
-      { text: finalCaption, mentions: users },
-      { quoted: fkontak }
-    )
-  } catch {
-    return await conn.sendMessage(
-      m.chat,
-      { text: '🔊 Notificación', mentions: users },
+      { text: userText || '🔊 Notificación', mentions: users },
       { quoted: fkontak }
     )
   }
+
+  const mediaType = isImage ? 'image' : 'video'
+  const baileyType = isImage ? 'imageMessage' : 'videoMessage'
+
+  let buffer = await downloadMedia(q[baileyType], mediaType)
+  if (!buffer && m.quoted?.download) buffer = await m.quoted.download()
+
+  const msg = {
+    mentions: users
+  }
+
+  if (isImage) {
+    msg.image = buffer
+    msg.caption = userText || ''
+  } else if (isVideo) {
+    msg.video = buffer
+    msg.caption = userText || ''
+    msg.mimetype = 'video/mp4'
+  }
+
+  return await conn.sendMessage(m.chat, msg, { quoted: fkontak })
 }
 
-handler.help = ["𝖭𝗈𝗍𝗂𝖿𝗒"]
-handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"]
+handler.help = ["notify"]
+handler.tags = ["grupos"]
 handler.customPrefix = /^\.?n(\s|$)/i
 handler.command = new RegExp()
 handler.group = true
