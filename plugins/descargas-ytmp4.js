@@ -3,14 +3,13 @@ import axios from "axios";
 const API_BASE = process.env.API_BASE || "https://api-sky.ultraplus.click";
 const API_KEY  = process.env.API_KEY  || "Russellxz";
 
-// Timeout real
-const AXIOS_TIMEOUT = 60000; // 60s
+const AXIOS_TIMEOUT = 0;
 axios.defaults.timeout = AXIOS_TIMEOUT;
 axios.defaults.maxBodyLength = Infinity;
 axios.defaults.maxContentLength = Infinity;
 
 function isYouTube(u) {
-  return /^https?:\/\//i.test(u) && /(youtube\.com|youtu\.be|music\.youtube\.com)/i.test(u);
+  return /^https?:\/\//i.test(u) && /(youtube.com|youtu.be|music.youtube.com)/i.test(u);
 }
 
 function fmtDur(s) {
@@ -47,44 +46,43 @@ async function callSkyYtVideo(url){
           validateStatus: () => true
         });
 
-        if (r.status >= 500 || r.status === 429 || r.status === 403) {
-          lastErr = new Error(`HTTP ${r.status}${r.data?.error ? ` - ${r.data.error}` : ""}`);
-          await sleep(1000 * attempt);
-          continue;
-        }
+        if (r.status >= 500 || r.status === 429 || r.status === 403) {  
+          lastErr = new Error(`HTTP ${r.status}${r.data?.error ? ` - ${r.data.error}` : ""}`);  
+          await sleep(1000 * attempt);  
+          continue;  
+        }  
 
-        if (r.status !== 200) {
-          lastErr = new Error(`HTTP ${r.status}`);
-          await sleep(1000 * attempt);
-          continue;
-        }
+        if (r.status !== 200) {  
+          lastErr = new Error(`HTTP ${r.status}`);  
+          await sleep(1000 * attempt);  
+          continue;  
+        }  
 
-        const ok = r.data && r.data.status === "true" && r.data.data;
-        if (!ok) {
-          lastErr = new Error(`API inválida: ${JSON.stringify(r.data)}`);
-          await sleep(1000 * attempt);
-          continue;
-        }
+        const ok = r.data && r.data.status === "true" && r.data.data;  
+        if (!ok) {  
+          lastErr = new Error(`API inválida: ${JSON.stringify(r.data)}`);  
+          await sleep(1000 * attempt);  
+          continue;  
+        }  
 
-        const d = r.data.data || {};
-        const mediaUrl = d.video || d.audio;
-        if (!mediaUrl) {
-          lastErr = new Error("El API no devolvió video.");
-          await sleep(1000 * attempt);
-          continue;
-        }
+        const d = r.data.data || {};  
+        const mediaUrl = d.video || d.audio;  
+        if (!mediaUrl) {  
+          lastErr = new Error("El API no devolvió video.");  
+          await sleep(1000 * attempt);  
+          continue;  
+        }  
 
-        return { mediaUrl, meta: d };
-      } catch (e) {
-        lastErr = e;
-        await sleep(1000 * attempt);
-      }
+        return { mediaUrl, meta: d };  
+      } catch (e) {  
+        lastErr = e;  
+        await sleep(1000 * attempt);  
+      }  
     }
   }
 
   throw lastErr || new Error("No se pudo obtener el video.");
 }
-
 
 const handler = async (msg, { conn, args, command }) => {
   const jid  = msg.key.remoteJid;
@@ -97,19 +95,19 @@ const handler = async (msg, { conn, args, command }) => {
     }, { quoted: msg });
   }
   if (!isYouTube(url)) {
-    return conn.sendMessage(jid, { text: "❌ *URL de YouTube inválida.*" }, { quoted: msg });
+    return conn.sendMessage(jid, { text: "❌ URL de YouTube inválida." }, { quoted: msg });
   }
 
   try {
     await conn.sendMessage(jid, { react: { text: "⏱️", key: msg.key } });
 
-    const { mediaUrl, meta } = await callSkyYtVideo(url);
-    const title = meta.title || "YouTube Video";
-    const dur   = meta.duration ? fmtDur(meta.duration) : "—";
-    const thumb = meta.thumbnail || "";
+    const { mediaUrl, meta } = await callSkyYtVideo(url);  
+    const title = meta.title || "YouTube Video";  
+    const dur   = meta.duration ? fmtDur(meta.duration) : "—";  
+    const thumb = meta.thumbnail || "";  
 
     const caption =
-`⚡ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 — 𝗩𝗶𝗱𝗲𝗼
+      `⚡ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 — 𝗩𝗶𝗱𝗲𝗼
 
 Elige cómo enviarlo:
 👍 𝗩𝗶𝗱𝗲𝗼 (normal)
@@ -122,70 +120,57 @@ Elige cómo enviarlo:
 ────────────
 `;
 
-    let selectorMsg;
-    if (thumb) {
-      selectorMsg = await conn.sendMessage(jid, { image: { url: thumb }, caption }, { quoted: msg });
-    } else {
-      selectorMsg = await conn.sendMessage(jid, { text: caption }, { quoted: msg });
-    }
+    let selectorMsg;  
+    if (thumb) {  
+      selectorMsg = await conn.sendMessage(jid, { image: { url: thumb }, caption }, { quoted: msg });  
+    } else {  
+      selectorMsg = await conn.sendMessage(jid, { text: caption }, { quoted: msg });  
+    }  
 
-    // Guardar tarea con expiración
-    pendingYTV[selectorMsg.key.id] = {
-      chatId: jid,
-      mediaUrl,
-      title,
-      duration: dur,
-      baseMsg: msg,
-      expire: Date.now() + 5 * 60 * 1000 // 5 minutos
-    };
+    pendingYTV[selectorMsg.key.id] = {  
+      chatId: jid,  
+      mediaUrl,  
+      title,  
+      baseMsg: msg  
+    };  
 
-    await conn.sendMessage(jid, { react: { text: "✅", key: msg.key } });
+    await conn.sendMessage(jid, { react: { text: "✅", key: msg.key } });  
 
+    if (!conn._ytvListener) {  
+      conn._ytvListener = true;  
+      conn.ev.on("messages.upsert", async (ev) => {  
+        for (const m of ev.messages) {  
+          try {  
+            if (m.message?.reactionMessage) {  
+              const { key: reactedKey, text: emoji } = m.message.reactionMessage;  
+              const job = pendingYTV[reactedKey.id];  
+              if (job) {  
+                const asDoc = emoji === "❤️";  
+                await sendVideo(conn, job, asDoc, m);  
+                delete pendingYTV[reactedKey.id];  
+              }  
+            }  
 
-    // Activar listener una sola vez
-    if (!conn._ytvListenerActive) {
-      conn._ytvListenerActive = true;
-
-      conn.ev.on("messages.upsert", async (ev) => {
-        for (const m of ev.messages) {
-          try {
-            // limpieza automática
-            for (const id in pendingYTV) {
-              if (Date.now() > pendingYTV[id].expire) delete pendingYTV[id];
-            }
-
-            if (m.message?.reactionMessage) {
-              const { key: reactedKey, text: emoji } = m.message.reactionMessage;
-              const job = pendingYTV[reactedKey.id];
-              if (job) {
-                const asDoc = emoji === "❤️";
-                await sendVideo(conn, job, asDoc, m);
-                delete pendingYTV[reactedKey.id];
-              }
-            }
-
-            const ctx = m.message?.extendedTextMessage?.contextInfo;
-            const replyTo = ctx?.stanzaId;
-            const txt = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim().toLowerCase();
-
-            if (replyTo && pendingYTV[replyTo]) {
-              const job = pendingYTV[replyTo];
-
-              if (txt === "1" || txt === "2") {
-                const asDoc = txt === "2";
-                await sendVideo(conn, job, asDoc, m);
-                delete pendingYTV[replyTo];
-              } else if (txt) {
-                await conn.sendMessage(job.chatId, {
-                  text: "⚠️ Responde con *1* (video) o *2* (documento), o reacciona con 👍 / ❤️."
-                }, { quoted: job.baseMsg });
-              }
-            }
-          } catch (e) {
-            console.error("ytmp4 listener error:", e);
-          }
-        }
-      });
+            const ctx = m.message?.extendedTextMessage?.contextInfo;  
+            const replyTo = ctx?.stanzaId;  
+            const txt = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim().toLowerCase();  
+            if (replyTo && pendingYTV[replyTo]) {  
+              const job = pendingYTV[replyTo];  
+              if (txt === "1" || txt === "2") {  
+                const asDoc = txt === "2";  
+                await sendVideo(conn, job, asDoc, m);  
+                delete pendingYTV[replyTo];  
+              } else if (txt) {  
+                await conn.sendMessage(job.chatId, {  
+                  text: "⚠️ Responde con *1* (video) o *2* (documento), o reacciona con 👍 / ❤️."  
+                }, { quoted: job.baseMsg });  
+              }  
+            }  
+          } catch (e) {  
+            console.error("ytmp4 listener error:", e);  
+          }  
+        }  
+      });  
     }
 
   } catch (err) {
@@ -197,18 +182,16 @@ Elige cómo enviarlo:
   }
 };
 
-
 async function sendVideo(conn, job, asDocument, triggerMsg){
-  const { chatId, mediaUrl, title, duration, baseMsg } = job;
+  const { chatId, mediaUrl, title, baseMsg } = job;
 
   await conn.sendMessage(chatId, { react: { text: asDocument ? "📁" : "🎬", key: triggerMsg.key } });
   await conn.sendMessage(chatId, { text: `⏳ Enviando ${asDocument ? "como documento" : "video"}…` }, { quoted: baseMsg });
 
   const caption =
-`⚡ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 𝗩𝗶𝗱𝗲𝗼 — 𝗟𝗶𝘀𝘁𝗼
+    `⚡ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 𝗩𝗶𝗱𝗲𝗼 — 𝗟𝗶𝘀𝘁𝗼
 
 ✦ 𝗧𝗶́𝘁𝘂𝗹𝗼: ${title}
-✦ 𝗗𝘂𝗿𝗮𝗰𝗶𝗼́𝗻: ${duration}
 ✦ 𝗦𝗼𝘂𝗿𝗰𝗲: api-sky.ultraplus.click
 `;
 
@@ -230,8 +213,7 @@ async function sendVideo(conn, job, asDocument, triggerMsg){
   await conn.sendMessage(chatId, { react: { text: "✅", key: triggerMsg.key } });
 }
 
+handler.command = ["ytmp4","ytv"];
 handler.help = ["𝖸𝗍𝗆𝗉4 <𝗎𝗋𝗅>"];
 handler.tags = ["𝖣𝖤𝖲𝖢𝖠𝖱𝖦𝖠𝖲"];
-handler.command = ["ytmp4","ytv"];
-
 export default handler;
