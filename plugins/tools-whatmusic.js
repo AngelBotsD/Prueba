@@ -1,6 +1,9 @@
 import acrcloud from 'acrcloud'
 import yts from 'yt-search'
 import fetch from 'node-fetch'
+import crypto from 'crypto'
+
+global.whatMusicCache = global.whatMusicCache || new Map()
 
 let acr = new acrcloud({
   host: 'identify-eu-west-1.acrcloud.com',
@@ -10,34 +13,31 @@ let acr = new acrcloud({
 
 let handler = async (m, { conn, usedPrefix, command }) => {
   try {
-    let q = m.quoted ? m.quoted : m
-    let mime = (q.msg || q).mimetype || q.mediaType || ''
-    if (!/video|audio/.test(mime)) {
-      return conn.reply(
-        m.chat,
-        `${emoji} Etiqueta un *audio* o *video corto* con *${usedPrefix + command}* para identificar la música.`,
-        m,
-        rcanal
-      )
+    await conn.sendMessage(m.chat, { react: { text: "🕒", key: m.key } })
+
+    const q = m.quoted ? m.quoted : m
+    const mime = (q.msg || q).mimetype || q.mediaType || ''
+    if (!/audio|video/.test(mime)) {
+      return conn.reply(m.chat, `Etiqueta un audio o video con ${usedPrefix + command}`, m)
     }
 
-    let buffer = await q.download()
-    if (!buffer) {
-      return conn.reply(m.chat, '❌ No pude descargar el archivo.', m, rcanal)
+    const buffer = await q.download?.()
+    if (!buffer) return conn.reply(m.chat, 'No pude descargar el archivo.', m)
+
+    const duration = q.seconds || 0
+    if (duration > 180) {
+      return conn.reply(m.chat, `El archivo solo puede durar 3 minutos máximo. El tuyo dura ${duration}s.`, m)
     }
 
-    let duration = q.seconds || 0
-    if (duration > 240) {
-      return conn.reply(
-        m.chat,
-        `⚠️ El archivo solo puede durar *180 segundos máximo*. El que enviaste dura *${duration}s*.`,
-        m,
-        rcanal
-      )
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex')
+
+    if (whatMusicCache.has(hash)) {
+      const data = whatMusicCache.get(hash)
+      return conn.sendMessage(m.chat, data.msg, { quoted: data.q })
     }
 
-    const res = await fetch('https://files.catbox.moe/64ots5.png')
-    const thumb2 = Buffer.from(await res.arrayBuffer())
+    const resThumb = await fetch('https://files.catbox.moe/64ots5.png')
+    const thumb2 = Buffer.from(await resThumb.arrayBuffer())
 
     const fkontak = {
       key: {
@@ -48,73 +48,82 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       },
       message: {
         locationMessage: {
-          name: `𝗥𝗘𝗦𝗨𝗟𝗧𝗔𝗗𝗢𝗦 𝗗𝗘 𝗔𝗖𝗥𝗖𝗟𝗢𝗨𝗗`,
+          name: `Resultados ACRCloud`,
           jpegThumbnail: thumb2
         }
-      },
-      participant: '0@s.whatsapp.net'
+      }
     }
 
-    let result = await acr.identify(buffer)
-
-    if (!result || !result.status) {
-      throw new Error('Respuesta inválida del servidor ACRCloud.')
+    let result
+    try {
+      result = await acr.identify(buffer)
+    } catch {
+      return conn.reply(m.chat, `Error con ACRCloud.`, m)
     }
 
-    let { status, metadata } = result
+    if (!result?.status || result.status.code !== 0)
+      return conn.reply(m.chat, `${result?.status?.msg || 'Error desconocido.'}`, m)
 
-    if (status.code !== 0) {
-      return conn.reply(m.chat, `❌ ${status.msg}`, m, rcanal)
+    const music = result.metadata.music?.[0]
+    if (!music)
+      return conn.reply(m.chat, 'No se pudo identificar la música.', m)
+
+    const { title, artists, album, genres, release_date } = music
+    const artistName = artists?.[0]?.name || ''
+    let ytQuery = `${title} ${artistName}`.trim()
+
+    let searchResults = await yts.search(ytQuery).catch(() => null)
+    if (!searchResults?.videos?.length || searchResults.videos[0].views < 1000) {
+      searchResults = await yts.search(title).catch(() => null)
     }
 
-    if (!metadata || !metadata.music || metadata.music.length === 0) {
-      return conn.reply(m.chat, '❌ No se pudo identificar la música.', m, rcanal)
-    }
+    const videos = (searchResults?.videos || []).filter(v =>
+      v.views > 500 && v.duration.seconds < 600
+    )
 
-    let music = metadata.music[0]
-    let { title, artists, album, genres, release_date } = music
+    let txt = `┏╾❑「 Whatmusic Tools 」\n`
+    txt += `┃  Título: ${title || 'Desconocido'}\n`
+    txt += `┃  Artista: ${artists?.map(v => v.name).join(', ') || 'Desconocido'}\n`
+    if (album) txt += `┃  Álbum: ${album.name}\n`
+    if (genres) txt += `┃  Género: ${genres.map(v => v.name).join(', ')}\n`
+    txt += `┃  Lanzamiento: ${release_date || 'Desconocido'}\n`
 
-    let txt = '┏╾❑「 *Whatmusic Tools* 」\n'
-    txt += `┃  ≡◦ *Título ∙* ${title || 'Desconocido'}\n`
-    if (artists) txt += `┃  ≡◦ *Artista ∙* ${artists.map(v => v.name).join(', ')}\n`
-    if (album) txt += `┃  ≡◦ *Álbum ∙* ${album.name}\n`
-    if (genres) txt += `┃  ≡◦ *Género ∙* ${genres.map(v => v.name).join(', ')}\n`
-    txt += `┃  ≡◦ *Fecha de lanzamiento ∙* ${release_date || 'Desconocida'}\n`
+    const video = videos?.[0]
 
-
-    const searchResults = await yts.search(title).catch(() => null)
-
-    if (searchResults && searchResults.videos && searchResults.videos.length > 0) {
-      const video = searchResults.videos[0]
+    if (video) {
       const { url, title: ytTitle, author, views, timestamp, thumbnail } = video
 
-      txt += `┃  ≡◦ *YouTube:* ${ytTitle}\n`
-      txt += `┃  ≡◦ *Canal:* ${author?.name || 'Desconocido'}\n`
-      txt += `┃  ≡◦ *Vistas:* ${views}\n`
-      txt += `┃  ≡◦ *Duración:* ${timestamp}\n`
-      txt += `┃  ≡◦ *URL del video:* ${url}\n`
+      txt += `┃  YouTube: ${ytTitle}\n`
+      txt += `┃  Canal: ${author?.name || 'Desconocido'}\n`
+      txt += `┃  Vistas: ${views.toLocaleString()}\n`
+      txt += `┃  Duración: ${timestamp}\n`
+      txt += `┃  URL: ${url}\n`
       txt += `┗╾❑`
 
       const thumbRes = await fetch(thumbnail)
       const thumbBuffer = Buffer.from(await thumbRes.arrayBuffer())
 
-      await conn.sendMessage(
-        m.chat,
-        { image: thumbBuffer, caption: txt },
-        { quoted: fkontak }
-      )
-    } else {
+      const msg = { image: thumbBuffer, caption: txt }
+      whatMusicCache.set(hash, { msg, q: fkontak })
 
-      txt += `┗╾❑`
-      await conn.sendMessage(
-        m.chat,
-        { text: txt },
-        { quoted: fkontak }
-      )
+      if (whatMusicCache.size > 200)
+        whatMusicCache.clear()
+
+      return conn.sendMessage(m.chat, msg, { quoted: fkontak })
     }
+
+    txt += `┗╾❑`
+
+    const msg = { text: txt }
+    whatMusicCache.set(hash, { msg, q: fkontak })
+
+    if (whatMusicCache.size > 200)
+      whatMusicCache.clear()
+
+    return conn.sendMessage(m.chat, msg, { quoted: fkontak })
+
   } catch (err) {
-    console.error(err)
-    conn.reply(m.chat, `❌ Error al procesar la música: ${err.message}`, m, rcanal)
+    return conn.reply(m.chat, `Error: ${err.message}`, m)
   }
 }
 
