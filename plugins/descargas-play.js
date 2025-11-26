@@ -202,9 +202,8 @@ const handler = async(msg,{conn,text,command})=>{
     title,
     commandMsg: msg,
     sender: msg.key.participant || msg.participant,
-    downloading: false,
-    time: Date.now(),
-    listener: null
+    lock: null,
+    time: Date.now()
   }
 
   cache[videoUrl] = cache[videoUrl] || { time: Date.now(), files: {} }
@@ -219,12 +218,16 @@ const handler = async(msg,{conn,text,command})=>{
         const react = m.message?.reactionMessage
         if(react){
           const job = pending[react.key?.id]
-          if(job && !job.downloading && (react.sender || m.key.participant) === job.sender){
-            job.downloading = true
-            await conn.sendMessage(job.chatId,{text:`⏳ Descargando ${{"👍":"audio","❤️":"video","📄":"audioDoc","📁":"videoDoc"}[react.text] || "archivo"}...`},{quoted:job.commandMsg})
-            try{ await handleDownload(conn,job,react.text) }finally{ job.downloading = false }
+          if(job && (react.sender || m.key.participant) === job.sender){
+            if(!job.lock){
+              job.lock = (async ()=>{
+                await conn.sendMessage(job.chatId,{text:`⏳ Descargando ${{"👍":"audio","❤️":"video","📄":"audioDoc","📁":"videoDoc"}[react.text] || "archivo"}...`},{quoted:job.commandMsg})
+                try{ await handleDownload(conn,job,react.text) } finally { job.lock = null }
+              })()
+            }
           }
         }
+
         const context = m.message?.extendedTextMessage?.contextInfo
         const citado = context?.stanzaId
         const texto = (m.message?.conversation || m.message?.extendedTextMessage?.text || "").toLowerCase().trim()
@@ -233,11 +236,19 @@ const handler = async(msg,{conn,text,command})=>{
           const audioKeys = ["1","audio","4","audiodoc"]
           const videoKeys = ["2","video","3","videodoc"]
           if(audioKeys.includes(texto)){
-            await conn.sendMessage(m.key.remoteJid,{text:"🎶 Descargando audio..."},{quoted:m})
-            await downloadAudio(conn,job,["4","audiodoc"].includes(texto),m)
+            if(!job.lock){
+              job.lock = (async ()=>{
+                await conn.sendMessage(m.key.remoteJid,{text:"🎶 Descargando audio..."},{quoted:m})
+                try{ await downloadAudio(conn,job,true,m) } finally { job.lock = null }
+              })()
+            }
           } else if(videoKeys.includes(texto)){
-            await conn.sendMessage(m.key.remoteJid,{text:"🎥 Descargando video..."},{quoted:m})
-            await downloadVideo(conn,job,["3","videodoc"].includes(texto),m)
+            if(!job.lock){
+              job.lock = (async ()=>{
+                await conn.sendMessage(m.key.remoteJid,{text:"🎥 Descargando video..."},{quoted:m})
+                try{ await downloadVideo(conn,job,true,m) } finally { job.lock = null }
+              })()
+            }
           } else {
             await conn.sendMessage(m.key.remoteJid,{text:"⚠️ Opciones válidas: 1/audio,4/audiodoc → audio; 2/video,3/videodoc → video"},{quoted:m})
           }
@@ -246,7 +257,9 @@ const handler = async(msg,{conn,text,command})=>{
     }
   }
 
-  if(pending[previewId].listener) conn.ev.off("messages.upsert", pending[previewId].listener)
+  if(previewId in pending && pending[previewId].listener && global.conn){
+    global.conn.ev.off("messages.upsert", pending[previewId].listener)
+  }
   pending[previewId].listener = listener
   conn.ev.on("messages.upsert", listener)
 
@@ -263,82 +276,69 @@ async function handleDownload(conn,job,choice){
   const key = mapping[choice]
   if(!key) return
   const isDoc = key.endsWith("Doc")
-  await conn.sendMessage(job.chatId,{text:`⏳ Descargando ${isDoc?"documento":key}…`},{quoted:job.commandMsg})
-  if(key.startsWith("audio")) await downloadAudio(conn,job,isDoc,job.commandMsg)
-  else await downloadVideo(conn,job,isDoc,job.commandMsg)
+  if(!job.lock){
+    job.lock = (async ()=>{
+      await conn.sendMessage(job.chatId,{text:`⏳ Descargando ${isDoc?"documento":key}…`},{quoted:job.commandMsg})
+      try{
+        if(key.startsWith("audio")) await downloadAudio(conn,job,isDoc,job.commandMsg)
+        else await downloadVideo(conn,job,isDoc,job.commandMsg)
+      } finally { job.lock = null }
+    })()
+  }
+  await job.lock
 }
 
 async function downloadAudio(conn,job,asDocument,quoted){
   const { chatId, videoUrl, title } = job
   const data = await getSkyApiUrl(videoUrl,"audio")
   if(!data) return conn.sendMessage(chatId,{text:"❌ No se pudo obtener audio."},{quoted})
-
   try{
     const tasks = ensureTask(videoUrl,"audio")
     let file
-    if(tasks.status==="done" && tasks.file && fs.existsSync(tasks.file)){
-      file = tasks.file
-    } else {
+    if(tasks.status==="done" && tasks.file && fs.existsSync(tasks.file)) file = tasks.file
+    else {
       metrics.totalDownloads++
       file = await startDownload(videoUrl,"audio",data,false,0)
     }
-
     if(!file || !fs.existsSync(file)) return conn.sendMessage(chatId,{text:"❌ Falló la descarga final."},{quoted})
     if(fileSizeMB(file)>MAX_FILE_MB) return conn.sendMessage(chatId,{text:"❌ Archivo >99MB"},{quoted})
-
     await sendFileToChat(conn,chatId,file,title,asDocument,"audio",quoted)
-
     cache[videoUrl] = cache[videoUrl] || { time: Date.now(), files: {} }
     cache[videoUrl].time = Date.now()
     cache[videoUrl].files.audio = file
     saveCache()
-
     cleanupPendingByJob(job)
-
-  }catch(err){
-    console.error("downloadAudio error:",err)
-    await conn.sendMessage(chatId,{text:"❌ Error al descargar audio."},{quoted})
-  }
+  }catch(err){ console.error("downloadAudio error:",err); await conn.sendMessage(chatId,{text:"❌ Error al descargar audio."},{quoted}) }
 }
 
 async function downloadVideo(conn,job,asDocument,quoted){
   const { chatId, videoUrl, title } = job
   const data = await getSkyApiUrl(videoUrl,"video")
   if(!data) return conn.sendMessage(chatId,{text:"❌ No se pudo obtener video."},{quoted})
-
   try{
     const tasks = ensureTask(videoUrl,"video")
     let file
-    if(tasks.status==="done" && tasks.file && fs.existsSync(tasks.file)){
-      file = tasks.file
-    } else {
+    if(tasks.status==="done" && tasks.file && fs.existsSync(tasks.file)) file = tasks.file
+    else {
       metrics.totalDownloads++
       file = await startDownload(videoUrl,"video",data,false,0)
     }
-
     if(!file || !fs.existsSync(file)) return conn.sendMessage(chatId,{text:"❌ Falló la descarga final."},{quoted})
     if(fileSizeMB(file)>MAX_FILE_MB) return conn.sendMessage(chatId,{text:"❌ Archivo >99MB"},{quoted})
-
     await sendFileToChat(conn,chatId,file,title,asDocument,"video",quoted)
-
     cache[videoUrl] = cache[videoUrl] || { time: Date.now(), files: {} }
     cache[videoUrl].time = Date.now()
     cache[videoUrl].files.video = file
     saveCache()
-
     cleanupPendingByJob(job)
-
-  }catch(err){
-    console.error("downloadVideo error:",err)
-    await conn.sendMessage(chatId,{text:"❌ Error al descargar video."},{quoted})
-  }
+  }catch(err){ console.error("downloadVideo error:",err); await conn.sendMessage(chatId,{text:"❌ Error al descargar video."},{quoted}) }
 }
 
 function cleanupPendingByJob(job){
   try{
     for(const id of Object.keys(pending)){
       const p = pending[id]
-      if(p && p.chatId===job.chatId && p.videoUrl===job.videoUrl && (p.sender===job.sender || !job.sender)){
+      if(p && p.chatId===job.chatId && p.videoUrl===job.videoUrl){
         try{ if(p.listener && global.conn) global.conn.ev.off("messages.upsert", p.listener) }catch(e){}
         delete pending[id]
       }
@@ -406,4 +406,5 @@ global.autoclean = autoClean
 handler.help=["𝖯𝗅𝖺𝗒 <𝖳𝖾𝗑𝗍𝗈>"]
 handler.tags=["𝖣𝖤𝖲𝖢𝖠𝖱𝖦𝖠𝖲"]
 handler.command=["play","clean"]
+
 export default handler
