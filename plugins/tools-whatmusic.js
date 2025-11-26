@@ -25,7 +25,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
     if (!buffer) return conn.reply(m.chat, 'No pude descargar el archivo.', m)
 
     const duration = q.seconds || 0
-    if (duration > 240) {
+    if (duration > 180) {
       return conn.reply(m.chat, `El archivo solo puede durar 3 minutos máximo. El tuyo dura ${duration}s.`, m)
     }
 
@@ -33,25 +33,7 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 
     if (whatMusicCache.has(hash)) {
       const data = whatMusicCache.get(hash)
-      return conn.sendMessage(m.chat, data.msg, { quoted: data.q })
-    }
-
-    const resThumb = await fetch('https://files.catbox.moe/64ots5.png')
-    const thumb2 = Buffer.from(await resThumb.arrayBuffer())
-
-    const fkontak = {
-      key: {
-        participants: '0@s.whatsapp.net',
-        remoteJid: 'status@broadcast',
-        fromMe: false,
-        id: 'Halo'
-      },
-      message: {
-        locationMessage: {
-          name: `Resultados ACRCloud`,
-          jpegThumbnail: thumb2
-        }
-      }
+      return conn.sendMessage(m.chat, data.msg, { quoted: m })
     }
 
     let result
@@ -104,23 +86,21 @@ let handler = async (m, { conn, usedPrefix, command }) => {
       const thumbBuffer = Buffer.from(await thumbRes.arrayBuffer())
 
       const msg = { image: thumbBuffer, caption: txt }
-      whatMusicCache.set(hash, { msg, q: fkontak })
 
-      if (whatMusicCache.size > 200)
-        whatMusicCache.clear()
+      whatMusicCache.set(hash, { msg, q: m })
+      if (whatMusicCache.size > 200) whatMusicCache.clear()
 
-      return conn.sendMessage(m.chat, msg, { quoted: fkontak })
+      return conn.sendMessage(m.chat, msg, { quoted: m })
     }
 
     txt += `┗╾❑`
 
     const msg = { text: txt }
-    whatMusicCache.set(hash, { msg, q: fkontak })
 
-    if (whatMusicCache.size > 200)
-      whatMusicCache.clear()
+    whatMusicCache.set(hash, { msg, q: m })
+    if (whatMusicCache.size > 200) whatMusicCache.clear()
 
-    return conn.sendMessage(m.chat, msg, { quoted: fkontak })
+    return conn.sendMessage(m.chat, msg, { quoted: m })
 
   } catch (err) {
     return conn.reply(m.chat, `Error: ${err.message}`, m)
