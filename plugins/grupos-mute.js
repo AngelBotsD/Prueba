@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'
 import fs from 'fs/promises'
 
-const OWNER_LID = '38354561278087@lid'
+const OWNER_LID = '205596594827283@lid'
 const DB_DIR = './database'
 const DATA_FILE = `${DB_DIR}/muted.json`
 
