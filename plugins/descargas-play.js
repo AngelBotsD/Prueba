@@ -35,7 +35,7 @@ async function callMyApi(url, format) {
   return r.data.data
 }
 
-export default async (msg, { conn, text }) => {
+const handler = async (msg, { conn, text }) => {
   const pref = global.prefixes?.[0] || "."
 
   if (!text || !text.trim()) {
@@ -95,8 +95,8 @@ Opciones:
     react: { text: "✅", key: msg.key }
   })
 
-  if (!conn._playproListener) {
-    conn._playproListener = true
+  if (!conn._playListener) {
+    conn._playListener = true
     conn.ev.on("messages.upsert", async ev => {
       for (const m of ev.messages) {
         if (m.message?.reactionMessage) {
@@ -137,7 +137,7 @@ Opciones:
               job._timer = setTimeout(() => delete pending[citado], 5 * 60 * 1000)
             }
           }
-        } catch (e) {}
+        } catch {}
       }
     })
   }
@@ -163,7 +163,6 @@ async function downloadAudio(conn, job, asDocument, quoted) {
   const { chatId, videoUrl, title } = job
   const data = await callMyApi(videoUrl, "audio")
   const mediaUrl = data.audio || data.video
-  if (!mediaUrl) throw new Error("No se pudo obtener audio")
 
   const tmp = path.join(process.cwd(), "tmp")
   if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
@@ -198,7 +197,7 @@ async function downloadAudio(conn, job, asDocument, quoted) {
   const sizeMB = fileSizeMB(outFile)
   if (sizeMB > 99) {
     try { fs.unlinkSync(outFile) } catch {}
-    await conn.sendMessage(chatId, { text: `El audio pesa ${sizeMB.toFixed(2)}MB` }, { quoted })
+    await conn.sendMessage(chatId, { text: `Archivo demasiado pesado (${sizeMB.toFixed(2)}MB)` }, { quoted })
     return
   }
 
@@ -216,7 +215,6 @@ async function downloadVideo(conn, job, asDocument, quoted) {
   const { chatId, videoUrl, title } = job
   const data = await callMyApi(videoUrl, "video")
   const mediaUrl = data.video || data.audio
-  if (!mediaUrl) throw new Error("No se pudo obtener video")
 
   const tmp = path.join(process.cwd(), "tmp")
   if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true })
@@ -227,7 +225,7 @@ async function downloadVideo(conn, job, asDocument, quoted) {
   const sizeMB = fileSizeMB(file)
   if (sizeMB > 99) {
     try { fs.unlinkSync(file) } catch {}
-    await conn.sendMessage(chatId, { text: `El video pesa ${sizeMB.toFixed(2)}MB` }, { quoted })
+    await conn.sendMessage(chatId, { text: `Archivo demasiado pesado (${sizeMB.toFixed(2)}MB)` }, { quoted })
     return
   }
 
@@ -240,4 +238,6 @@ async function downloadVideo(conn, job, asDocument, quoted) {
   try { fs.unlinkSync(file) } catch {}
 }
 
-export const command = ["play"]
+handler.command = ["play"]
+
+export default handler
