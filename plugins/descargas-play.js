@@ -295,7 +295,7 @@ const handler = async (msg, { conn, text, command }) => {
   const video = res.videos?.[0]
   if (!video) return await sendError(conn, msg.key.remoteJid, "Sin resultados.", msg)
   const { url: videoUrl, title, timestamp: duration, views, author, thumbnail } = video
-  const caption = `𝚂𝚄𝙿𝙴𝚁 𝙿𝙻𝙰𝗬
+  const caption = `┏━[ *Angel-𝖡᥆𝗍 𝖬𝗎𝗌𝗂𝖼 🎧* ]━┓
 🎵 Título: ${title}
 🕑 Duración: ${duration}
 👁️‍🗨️ Vistas: ${(views || 0).toLocaleString()}
