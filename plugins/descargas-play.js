@@ -297,7 +297,7 @@ const handler = async (msg, { conn, text, command }) => {
   const { url: videoUrl, title, timestamp: duration, views, author, thumbnail } = video
   const caption = `┏━[ *Angel-𝖡᥆𝗍 𝖬𝗎𝗌𝗂𝖼 🎧* ]━┓
 ┃⥤🎧 *Título:* ${title}
-🕑 Duración: ${duration}
+┃⥤⏱️ *Duración:* ${duration}
 👁️‍🗨️ Vistas: ${(views || 0).toLocaleString()}
 🎤 Artista: ${author?.name || author || "Desconocido"}
 🌐 Link: ${videoUrl}
