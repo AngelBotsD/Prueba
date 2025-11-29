@@ -10,63 +10,82 @@ const handler = async (m, { conn }) => {
   }
 
   try {
-    // --- Obtener link rápido ---
-    const inviteCode = await conn.groupInviteCode(chat);
-    const link = `https://chat.whatsapp.com/${inviteCode}`;
+    // Obtener metadata + link al mismo tiempo (PARALELO)
+    const [meta, code] = await Promise.all([
+      conn.groupMetadata(chat),
+      conn.groupInviteCode(chat)
+    ]);
 
-    // --- Metadata del grupo ---
-    const data = await conn.groupMetadata(chat);
-    const groupName = data.subject || "Grupo";
-
-    // --- Obtener foto de manera inteligente ---
-    let ppBuffer;
-
-    try {
-      const imgUrl = await conn.profilePictureUrl(chat, "image");
-      const res = await fetch(imgUrl, { timeout: 6000 });
-      ppBuffer = await res.buffer();
-    } catch {
-      // fallback rápido y liviano
-      const fallback = "https://files.catbox.moe/xr2m6u.jpg";
-      const res = await fetch(fallback);
-      ppBuffer = await res.buffer();
+    if (!code) {
+      return conn.sendMessage(chat, {
+        text: "🚫 Necesito ser *administrador* para obtener el link del grupo."
+      }, { quoted: m });
     }
 
-    // --- Caption optimizado ---
-    const caption =
-`*📌 Nombre del grupo:*  
-${groupName}
+    const groupName = meta.subject || "Grupo";
+    const link = `https://chat.whatsapp.com/${code}`;
 
-*🔗 Enlace de invitación:*  
+    // ==============================
+    // FOTO DEL GRUPO - ultra rápida
+    // ==============================
+
+    const fallback = "https://files.catbox.moe/xr2m6u.jpg";
+
+    const getPhoto = async () => {
+      try {
+        const url = await conn.profilePictureUrl(chat, "image").catch(() => null);
+        if (!url) return null;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (!res.ok) return null;
+        return Buffer.from(await res.arrayBuffer());
+      } catch {
+        return null;
+      }
+    };
+
+    // FOTO: si falla → fallback instantáneo (Promise.race)
+    const ppBuffer = await Promise.race([
+      getPhoto(),
+      new Promise(resolve => setTimeout(() => resolve(null), 6000))
+    ]) || await fetch(fallback).then(r => r.buffer());
+
+    // ==============================
+    // CAPTION
+    // ==============================
+    const caption =`${groupName}\n\n 
 ${link}
+`;
 
-──────────────
-_Enviado por el bot_`;
+    // ==============================
+    // ENVÍO OPTIMIZADO
+    // ==============================
 
-    // --- Envio más rápido posible ---
     await conn.sendMessage(chat, {
       image: ppBuffer,
       caption
     }, { quoted: m });
 
-    // --- Reacción ---
     conn.sendMessage(chat, {
       react: { text: "🔗", key: m.key }
     });
 
   } catch (err) {
     console.error("❌ Error en .link:", err);
-    await conn.sendMessage(chat, {
-      text: "⚠️ No se pudo obtener el link del grupo. ¿El bot es administrador?"
+    conn.sendMessage(chat, {
+      text: "⚠️ Error inesperado al obtener el link."
     }, { quoted: m });
   }
 };
 
-// Datos del comando
 handler.help = ["link", "enlace"];
 handler.tags = ["grupo"];
 handler.command = /^(link|enlace)$/i;
 handler.group = true;
-handler.admin = false;
 
 export default handler;
