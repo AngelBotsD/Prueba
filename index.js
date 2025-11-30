@@ -373,7 +373,7 @@ conn.credsUpdate = saveCreds.bind(global.conn, true)
 // Manejo seguro de chats sin usar fechas inválidas
 const chats = Object.entries(conn.chats || {})
   .filter(([jid, chat]) => !jid.endsWith('@g.us') && chat.isChats)
-  .map(([jid]) => jid) else {
+  .map(([jid]) => jid) {
 const chats = Object.entries(conn.chats || {})
   .filter(([jid, chat]) => !jid.endsWith('@g.us') && chat?.isChats)
   .map(([jid]) => jid)
