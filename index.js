@@ -382,7 +382,6 @@ conn.credsUpdate = saveCreds.bind(global.conn, true)
 conn.ev.on('messages.upsert', conn.handler)
 conn.ev.on('connection.update', conn.connectionUpdate)
 conn.ev.on('creds.update', conn.credsUpdate)
-}
 conn.ev.on('creds.update', conn.credsUpdate)
 isInit = false
 //return true
