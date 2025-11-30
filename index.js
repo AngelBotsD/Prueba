@@ -380,7 +380,6 @@ conn.ev.on('connection.update', conn.connectionUpdate)
 conn.ev.on('creds.update', conn.credsUpdate)
 isInit = false
 //return true
-}
 
 let rtU = join(__dirname, `./${jadi}`)
 if (!existsSync(rtU)) {
