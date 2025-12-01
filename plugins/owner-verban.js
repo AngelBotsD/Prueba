@@ -1,103 +1,49 @@
-// Detector avanzado compatible con ds6/meta
-// Usa múltiples capas, timeouts y retries para evitar colgones
-// Resultado: { label, confidence, details }
-
-const DEFAULT_TIMEOUT = 2000; // ms por intento
-const RETRIES = 2; // reintentos cortos por comprobación
-
-function timeoutPromise(promise, ms, label = "timeout") {
-    return Promise.race([
-        promise,
-        new Promise((_, rej) => setTimeout(() => rej(new Error(label)), ms))
-    ]);
-}
-
-async function tryWithRetries(fn, ms = DEFAULT_TIMEOUT, retries = RETRIES) {
-    let lastErr = null;
-    for (let i = 0; i <= retries; i++) {
-        try {
-            return await timeoutPromise(fn(), ms, `timeout-${i}`);
-        } catch (e) {
-            lastErr = e;
-            // pequeño backoff
-            await new Promise(r => setTimeout(r, 120 * (i + 1)));
-        }
-    }
-    throw lastErr;
-}
-
-function normalizeErrorMessage(e) {
-    if (!e) return "";
-    if (typeof e === "string") return e.toLowerCase();
-    if (e?.message) return String(e.message).toLowerCase();
-    if (e?.status) return String(e.status).toLowerCase();
-    return JSON.stringify(e).toLowerCase();
-}
-
-function classifyFromErrors(errMsgs = []) {
-    const all = errMsgs.join(" ");
-    if (!all) return null;
-    if (all.includes("forbidden") || all.includes("403")) return "forbidden";
-    if (all.includes("not found") || all.includes("404") || all.includes("not exist") || all.includes("not_registered")) return "not_found";
-    if (all.includes("quota") || all.includes("rate") || all.includes("too many requests")) return "rate_limited";
-    return "other";
-}
-
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52 722 758 4934`);
-
+    if (!args || args.length === 0) return m.reply("⚠️ Falta el número. Ejemplo: .wa +52 722 758 4934 o .wa +52 7227584934 --verbose");
     const raw = args.join(" ");
-    const number = raw.replace(/\D/g, "");
-    const jid = number + "@s.whatsapp.net";
+    const verbose = /--verbose|--v|:v\b/i.test(raw);
+    const numbers = raw.split(/\s+/).filter(x => !/--verbose|--v|:v\b/i.test(x)).map(s => s.replace(/\D/g, "")).filter(Boolean);
+    if (numbers.length === 0) return m.reply("⚠️ No encontré números válidos en tu mensaje.");
 
-    await m.reply(`🔍 *Analizando número en WhatsApp...*\n\nEsto no debería tardar más de 3 segundos.`);
+    const DEFAULT_TIMEOUT = 2000;
+    const RETRIES = 2;
 
-    const result = {
-        number,
-        jid,
-        timestamp: Date.now(),
-        steps: [],
-        label: null,
-        confidence: 0
+    const delay = ms => new Promise(res => setTimeout(res, ms));
+
+    const timeoutPromise = (p, ms, label = "timeout") => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(label)), ms))]);
+
+    const tryWithRetries = async (fn, ms = DEFAULT_TIMEOUT, retries = RETRIES) => {
+        let lastErr = null;
+        for (let i = 0; i <= retries; i++) {
+            try {
+                return await timeoutPromise(fn(), ms, `timeout-${i}`);
+            } catch (e) {
+                lastErr = e;
+                await delay(120 * (i + 1));
+            }
+        }
+        throw lastErr;
     };
 
-    // --- STEP 1: onWhatsApp (existencia) ---
-    try {
-        const start = Date.now();
-        const info = await tryWithRetries(() => conn.onWhatsApp(number), DEFAULT_TIMEOUT, 1);
-        const duration = Date.now() - start;
-        result.steps.push({ name: "onWhatsApp", ok: true, duration, raw: info });
-        result.exists = !!(info?.[0]?.exists);
-    } catch (e) {
-        result.steps.push({ name: "onWhatsApp", ok: false, err: normalizeErrorMessage(e) });
-        result.exists = false;
-    }
+    const normalizeErrorMessage = e => {
+        if (!e) return "";
+        if (typeof e === "string") return e.toLowerCase();
+        if (e?.message) return String(e.message).toLowerCase();
+        if (e?.status) return String(e.status).toLowerCase();
+        try { return JSON.stringify(e).toLowerCase(); } catch { return String(e).toLowerCase(); }
+    };
 
-    // If it doesn't exist -> no need to probe further
-    if (!result.exists) {
-        result.label = "NO_REGISTRADO";
-        result.confidence = 0.98;
-        return m.reply(
-`📱 Número: https://wa.me/${number}
+    const classifyFromErrors = errMsgs => {
+        const all = errMsgs.join(" ");
+        if (!all) return null;
+        if (all.includes("forbidden") || all.includes("403")) return "forbidden";
+        if (all.includes("not found") || all.includes("404") || all.includes("not exist") || all.includes("not_registered")) return "not_found";
+        if (all.includes("quota") || all.includes("rate") || all.includes("too many requests")) return "rate_limited";
+        return "other";
+    };
 
-❌ *NO REGISTRADO EN WHATSAPP*
-
-📌 Esto incluye:
-- Número no existente
-- Revisión temporal/permanente que lo deja "no registrado"
-- Suspensión o eliminación permanente`
-        );
-    }
-
-    // --- prepare containers for secondary probes ---
-    let statusOk = false, statusErr = null, presenceOk = false, presenceErr = null;
-    let bizOk = false, bizErr = null, picOk = false, picErr = null;
-
-    // Helper to attempt method only if exists on conn
-    async function safeAttempt(name, fn, ms = DEFAULT_TIMEOUT) {
-        if (!fn) {
-            return { ok: false, missing: true, err: "method_missing" };
-        }
+    const safeAttempt = async (label, fn, ms = DEFAULT_TIMEOUT) => {
+        if (typeof fn !== "function") return { ok: false, missing: true, err: "method_missing" };
         try {
             const start = Date.now();
             const res = await tryWithRetries(fn, ms, RETRIES);
@@ -106,137 +52,134 @@ let handler = async (m, { conn, args }) => {
         } catch (e) {
             return { ok: false, err: normalizeErrorMessage(e) };
         }
-    }
+    };
 
-    // --- STEP 2: fetchStatus ---
-    const st = await safeAttempt("fetchStatus", () => conn.fetchStatus(jid), DEFAULT_TIMEOUT);
-    result.steps.push({ name: "fetchStatus", ...st });
+    const runCheckForNumber = async number => {
+        const jid = number + "@s.whatsapp.net";
+        const result = { number, jid, timestamp: Date.now(), steps: [], exists: false, label: null, confidence: 0, details: {} };
 
-    if (st.ok && st.res?.status !== undefined) statusOk = true;
-    else statusErr = st.err || (st.missing ? "missing" : null);
+        const onWhatsAppAttempt = await safeAttempt("onWhatsApp", () => conn.onWhatsApp(number), DEFAULT_TIMEOUT);
+        result.steps.push({ name: "onWhatsApp", ...onWhatsAppAttempt });
+        if (onWhatsAppAttempt.ok) result.exists = !!(onWhatsAppAttempt.res?.[0]?.exists);
 
-    // --- STEP 3: requestPresenceUpdate OR presenceSubscribe ---
-    // ds6/meta can expose requestPresenceUpdate or presenceSubscribe patterns; try both.
-    const presenceAttempt = await (async () => {
-        // try requestPresenceUpdate first
-        let r = await safeAttempt("requestPresenceUpdate", () => conn.requestPresenceUpdate(jid), DEFAULT_TIMEOUT);
-        if (r.missing) {
-            // try presenceSubscribe then wait for a short period to see if conn emits presence (we don't rely on events here)
-            r = await safeAttempt("presenceSubscribe", () => conn.presenceSubscribe?.(jid), DEFAULT_TIMEOUT);
-        }
-        return r;
-    })();
-    result.steps.push({ name: "presenceProbe", ...presenceAttempt });
-
-    if (presenceAttempt.ok) presenceOk = true;
-    else presenceErr = presenceAttempt.err || (presenceAttempt.missing ? "missing" : null);
-
-    // --- STEP 4: getBusinessProfile ---
-    const biz = await safeAttempt("getBusinessProfile", () => conn.getBusinessProfile(jid), DEFAULT_TIMEOUT);
-    result.steps.push({ name: "getBusinessProfile", ...biz });
-    if (biz.ok && biz.res) bizOk = true;
-    else bizErr = biz.err || (biz.missing ? "missing" : null);
-
-    // --- STEP 5: profilePicture (optional, fallback only) ---
-    // NOT recommended as single source; used as a last-resort signal only if enabled on server
-    const pic = await safeAttempt("profilePictureUrl", () => conn.profilePictureUrl?.(jid, "image").then(u => !!u), 1500);
-    result.steps.push({ name: "profilePictureUrl", ...pic });
-    if (pic.ok && pic.res) picOk = true;
-    else picErr = pic.err || (pic.missing ? "missing" : null);
-
-    // Collect error msgs
-    const errMsgs = [statusErr, presenceErr, bizErr, picErr].filter(Boolean).map(s => String(s).toLowerCase());
-    const classified = classifyFromErrors(errMsgs);
-
-    // --- DECISION HEURISTICS (multi-layer) ---
-    // Priority:
-    // 1. If any secondary probe ok -> ACTIVE
-    // 2. If all secondary probes failed and errors point to forbidden/403 -> REVISIÓN TEMPORAL
-    // 3. If all failed and some point to not found/404 -> SUSPENDIDO/ELIMINADO
-    // 4. If all failed but responses are mixed/other -> SEMI-ACTIVE/PRIVADO (low confidence)
-
-    // 1) Active
-    if (statusOk || presenceOk || bizOk || picOk) {
-        result.label = "ACTIVO";
-        result.confidence = 0.95;
-        result.details = {
-            statusOk, presenceOk, bizOk, picOk,
-            reason: "Alguna de las capas secundarias respondió correctamente."
-        };
-
-        return m.reply(
-`📱 Número: https://wa.me/${number}
-
-🟢 *REGISTRADO Y ACTIVO EN WHATSAPP*
-
-Detalles:
-${statusOk ? "• Estado: OK\n" : ""}${presenceOk ? "• Presencia: OK\n" : ""}${bizOk ? "• Business: OK\n" : ""}${picOk ? "• Foto: OK (fallback)\n" : ""}
-
-(Confianza: 95%)`
-        );
-    }
-
-    // 2) All secondary failed -> analyze errors
-    if (!statusOk && !presenceOk && !bizOk && !picOk) {
-        // if errors indicate forbidden/403 -> temporal review
-        if (classified === "forbidden") {
-            result.label = "REVISION_TEMPORAL";
-            result.confidence = 0.92;
-            result.details = { errMsgs, classified, reason: "Código de error tipo 'forbidden' o 403 desde las APIs." };
-
-            return m.reply(
-`📱 Número: https://wa.me/${number}
-
-🟡 *EN REVISIÓN TEMPORAL POR WHATSAPP*
-📌 Existe, pero el servidor bloquea el acceso a estado/presencia/perfil (403 / forbidden).
-✔ Esto equivale a revisión temporal / restricción momentánea.
-(Confianza: 92%)`
-            );
+        if (!result.exists) {
+            result.label = "NO_REGISTRADO";
+            result.confidence = 0.98;
+            return result;
         }
 
-        // if errors indicate not found/404 -> suspicious: suspension/deleted
-        if (classified === "not_found") {
-            result.label = "SUSPENDIDO_O_ELIMINADO";
-            result.confidence = 0.9;
-            result.details = { errMsgs, classified, reason: "APIs responden tipo 'not found' o 404 en subcaps." };
+        const fetchStatusAttempt = await safeAttempt("fetchStatus", () => conn.fetchStatus(jid), DEFAULT_TIMEOUT);
+        result.steps.push({ name: "fetchStatus", ...fetchStatusAttempt });
+        const statusOk = fetchStatusAttempt.ok && fetchStatusAttempt.res?.status !== undefined;
+        if (statusOk) result.details.fetchStatus = fetchStatusAttempt.res;
 
-            return m.reply(
-`📱 Número: https://wa.me/${number}
+        const presenceAttempt = await (async () => {
+            let r = await safeAttempt("requestPresenceUpdate", () => conn.requestPresenceUpdate(jid), DEFAULT_TIMEOUT);
+            if (r.missing) r = await safeAttempt("presenceSubscribe", () => conn.presenceSubscribe?.(jid), DEFAULT_TIMEOUT);
+            return r;
+        })();
+        result.steps.push({ name: "presenceProbe", ...presenceAttempt });
+        const presenceOk = presenceAttempt.ok;
 
-🔴 *SUSPENDIDO O ELIMINADO (PERMANENTE)*
-📌 Aunque el registro histórico existe, las APIs reportan que los recursos no están disponibles (404/not found).
-(Confianza: 90%)`
-            );
+        const bizAttempt = await safeAttempt("getBusinessProfile", () => conn.getBusinessProfile(jid), DEFAULT_TIMEOUT);
+        result.steps.push({ name: "getBusinessProfile", ...bizAttempt });
+        const bizOk = bizAttempt.ok && !!bizAttempt.res;
+        if (bizOk) result.details.business = bizAttempt.res;
+
+        const picAttempt = await safeAttempt("profilePictureUrl", () => conn.profilePictureUrl?.(jid, "image").then(u => !!u), 1500);
+        result.steps.push({ name: "profilePictureUrl", ...picAttempt });
+        const picOk = picAttempt.ok && !!picAttempt.res;
+
+        const errMsgs = [fetchStatusAttempt.err, presenceAttempt.err, bizAttempt.err, picAttempt.err].filter(Boolean).map(String);
+        const classified = classifyFromErrors(errMsgs);
+
+        if (statusOk || presenceOk || bizOk || picOk) {
+            result.label = "ACTIVO";
+            result.confidence = 0.95;
+            result.details = { statusOk, presenceOk, bizOk, picOk, errMsgs };
+            return result;
         }
 
-        // else: mixed unknown errors — probable revisión suave / privacidad alta
-        result.label = "EXISTE_PERO_LIMITADO";
-        result.confidence = 0.6;
-        result.details = { errMsgs, classified, reason: "Todas las capas fallaron pero sin error claro; puede ser privacidad extrema, revisión suave o inconsistencia del servidor." };
+        if (!statusOk && !presenceOk && !bizOk && !picOk) {
+            if (classified === "forbidden") {
+                result.label = "REVISION_TEMPORAL";
+                result.confidence = 0.92;
+                result.details = { errMsgs, classified };
+                return result;
+            }
+            if (classified === "not_found") {
+                result.label = "SUSPENDIDO_O_ELIMINADO";
+                result.confidence = 0.9;
+                result.details = { errMsgs, classified };
+                return result;
+            }
+            result.label = "EXISTE_PERO_LIMITADO";
+            result.confidence = 0.6;
+            result.details = { errMsgs, classified };
+            return result;
+        }
 
-        return m.reply(
-`📱 Número: https://wa.me/${number}
+        result.label = "INDETERMINADO";
+        result.confidence = 0.5;
+        result.details = { errMsgs, classified };
+        return result;
+    };
 
-⚪ *EXISTE PERO NO RESPONDE COMPLETAMENTE*
-📌 Todas las comprobaciones secundarias fallaron, pero no hay un 403/404 claro.
-Posibles causas:
- - Privacidad extrema del usuario
- - Revisión suave / transición
- - Errores intermitentes del servidor
-
-(Confianza baja-moderada: 60%)`
-        );
+    const results = [];
+    for (let i = 0; i < numbers.length; i++) {
+        try {
+            const r = await runCheckForNumber(numbers[i]);
+            results.push(r);
+        } catch (e) {
+            results.push({ number: numbers[i], jid: numbers[i] + "@s.whatsapp.net", error: String(e) });
+        }
     }
 
-    // Fallback (should not reach)
-    result.label = result.label || "INDETERMINADO";
-    result.confidence = result.confidence || 0.5;
-    return m.reply(
-`📱 Número: https://wa.me/${number}
+    const buildMessageForResult = r => {
+        if (r.error) return `📱 Número: https://wa.me/${r.number}\n\n❗ Error interno: ${r.error}`;
+        if (r.label === "NO_REGISTRADO") {
+            return `📱 Número: https://wa.me/${r.number}\n\n❌ *NO REGISTRADO EN WHATSAPP*\n\n📌 Incluye: número no existente, revisión temporal/permanente que lo deja "no registrado", suspensión o eliminación. (Confianza ${(r.confidence*100).toFixed(0)}%)`;
+        }
+        if (r.label === "ACTIVO") {
+            const lines = [];
+            lines.push(`📱 Número: https://wa.me/${r.number}`);
+            lines.push("");
+            lines.push("🟢 *REGISTRADO Y ACTIVO EN WHATSAPP*");
+            if (r.details.business) lines.push("🏢 Cuenta Business");
+            else lines.push("👤 Cuenta personal (o no Business)");
+            lines.push("");
+            if (r.details.statusOk) lines.push("• Estado público: OK");
+            if (r.details.presenceOk) lines.push("• Presencia: OK");
+            if (r.details.bizOk) lines.push("• Business: OK");
+            if (r.details.picOk) lines.push("• Foto: OK (fallback)");
+            lines.push("");
+            lines.push(`(Confianza ${(r.confidence*100).toFixed(0)}%)`);
+            return lines.join("\n");
+        }
+        if (r.label === "REVISION_TEMPORAL") {
+            return `📱 Número: https://wa.me/${r.number}\n\n🟡 *EN REVISIÓN TEMPORAL POR WHATSAPP*\n\n📌 Existe, pero el servidor bloquea el acceso a estado/presencia/perfil (403 / forbidden). (Confianza ${(r.confidence*100).toFixed(0)}%)`;
+        }
+        if (r.label === "SUSPENDIDO_O_ELIMINADO") {
+            return `📱 Número: https://wa.me/${r.number}\n\n🔴 *SUSPENDIDO O ELIMINADO (PERMANENTE)*\n\n📌 Las APIs reportan recursos no disponibles (404 / not found). (Confianza ${(r.confidence*100).toFixed(0)}%)`;
+        }
+        if (r.label === "EXISTE_PERO_LIMITADO") {
+            return `📱 Número: https://wa.me/${r.number}\n\n⚪ *EXISTE PERO NO RESPONDE COMPLETAMENTE*\n\n📌 Todas las comprobaciones secundarias fallaron, sin 403/404 claro. Posibles causas: privacidad extrema, revisión suave o inconsistencia del servidor. (Confianza ${(r.confidence*100).toFixed(0)}%)`;
+        }
+        if (r.label === "INDETERMINADO") {
+            return `📱 Número: https://wa.me/${r.number}\n\n❓ *ESTADO INDETERMINADO*\n\n📌 Resultado ambiguo. Revisa logs internos para más detalles. (Confianza ${(r.confidence*100).toFixed(0)}%)`;
+        }
+        return `📱 Número: https://wa.me/${r.number}\n\n❓ *Sin clasificación*`;
+    };
 
-❓ *ESTADO INDETERMINADO*
-📌 Resultado ambiguo. Revisa logs internos para más detalles.`
-    );
+    for (let res of results) {
+        await m.reply(buildMessageForResult(res));
+        if (verbose) {
+            try {
+                const dbg = { number: res.number, label: res.label, confidence: res.confidence, steps: res.steps.map(s => ({ name: s.name, ok: !!s.ok, duration: s.duration || null, err: s.err || null })) };
+                await m.reply("DEBUG: " + JSON.stringify(dbg, null, 2));
+            } catch {}
+        }
+    }
 };
 
 handler.command = /^wa$/i;
