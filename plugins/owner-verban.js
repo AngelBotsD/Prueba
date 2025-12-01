@@ -1,127 +1,68 @@
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 *Ejemplo:* .wa +52 722 758 4934`);
+    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52 899 155 5766`);
 
     const number = args.join(" ").replace(/\D/g, "");
     const jid = number + "@s.whatsapp.net";
 
-    await m.reply(`🔍 *Analizando número actual en WhatsApp...*`);
+    await m.reply(`🔍 *Analizando número...*`);
 
-    let existsNow = false;
+    let exists = false;
+    let assert = false;
     let pp = false;
     let status = false;
-    let assert = false;
     let presence = false;
-    let rawError = "";
+    let raw = "";
 
-    // =============================
-    // 🔍 PRUEBA PRINCIPAL: REGISTRO ACTUAL
-    // =============================
+    // -------- EXISTE O NO --------
     try {
         const wa = await conn.onWhatsApp(jid);
-        existsNow = !!(wa && wa[0] && wa[0].exists);
-    } catch (e) {
-        rawError = e?.message || "";
-    }
+        exists = !!(wa?.[0]?.exists);
+    } catch (e) {}
 
-    // SI NO ESTÁ REGISTRADO → MENSAJE DIRECTO
-    if (!existsNow) {
-        return m.reply(
-`📱 Número: https://wa.me/${number}
-
-❌ *ESTE NÚMERO YA NO ESTÁ REGISTRADO EN WHATSAPP*
-No tiene un registro activo en la base de datos de WhatsApp.
-
-🧪 Esto significa:
-- Puede haber sido baneado permanentemente
-- Puede haber sido reciclado por la compañía telefónica
-- O simplemente jamás fue una cuenta activa`
-        );
-    }
-
-    // =============================
-    // 🔍 PRUEBAS ADICIONALES
-    // =============================
-
-    try {
-        await conn.profilePictureUrl(jid, 'image');
-        pp = true;
-    } catch {}
-
-    try {
-        await conn.fetchStatus(jid);
-        status = true;
-    } catch {}
-
+    // -------- ASSERT (VALIDACIÓN REAL DEL ESTADO ACTUAL) --------
     try {
         await conn.assertJidExists(jid);
         assert = true;
-    } catch {}
-
-    try {
-        await conn.presenceSubscribe(jid);
-        presence = true;
-    } catch {}
-
-    // =============================
-    // 🔥 DETECCIÓN DE BLOQUEO
-    // =============================
-
-    let temporal = false;
-    let permanente = false;
-
-    // BLOQUEO PERMANENTE (cuenta existe pero backend la rechaza)
-    if (!pp && !status && !assert && presence === false) {
-        permanente = true;
+    } catch (e) {
+        raw = e?.message || "";
     }
 
-    // BLOQUEO TEMPORAL (limitado pero aún con registro válido)
-    if (!permanente && existsNow && !presence && !status) {
-        temporal = true;
-    }
-
-    if (permanente) {
+    // SI ASSERT FALLA PERO EXISTE → REVISIÓN TEMPORAL / PERMANENTE
+    if (exists && !assert) {
         return m.reply(
-`📱 Número: https://wa.me/${number}
+`📱 *Número:* https://wa.me/${number}
 
-🔴 *BLOQUEO PERMANENTE DETECTADO*
-El número aparece registrado, pero WhatsApp no permite consultas internas.
+🟠 *ESTADO: REVISIÓN / BLOQUEO*
+
+WhatsApp reporta:
+❌ *"Este número ya no está registrado"*  
+Esto ocurre cuando:
+- El número está en revisión temporal
+- El número está en revisión permanente
+- WhatsApp limitó todas las consultas internas
 
 🧪 Indicadores:
-▪ Foto: *${pp}*
-▪ Status: *${status}*
-▪ assertJid: *${assert}*
-▪ Presencia: *${presence}*`
+▪ exists (registro histórico): *${exists}*
+▪ assertJidExists (registro actual): *${assert}*`
         );
     }
 
-    if (temporal) {
+    // SI NO EXISTE EN NINGÚN LADO
+    if (!exists && !assert) {
         return m.reply(
-`📱 Número: https://wa.me/${number}
+`📱 *Número:* https://wa.me/${number}
 
-🟠 *BLOQUEO TEMPORAL DETECTADO*
-El número existe, pero WhatsApp limita consultas internas temporalmente.
-
-🧪 Indicadores:
-▪ Foto: *${pp}*
-▪ Status: *${status}*
-▪ assertJid: *${assert}*
-▪ Presencia: *${presence}*`
+❌ *ESTE NÚMERO NO ESTÁ REGISTRADO EN WHATSAPP*
+No existe un registro actual ni histórico.`
         );
     }
 
-    // =============================
-    // 🟢 ACTIVO
-    // =============================
+    // -------- SI LLEGA AQUI → ACTIVO --------
     return m.reply(
-`📱 Número: https://wa.me/${number}
+`📱 *Número:* https://wa.me/${number}
 
 🟢 *ESTADO: ACTIVO*
-Este número está registrado actualmente en WhatsApp.
-
-▪ Foto: *${pp}*
-▪ Status: *${status}*
-▪ assertJid: *${assert}*
-▪ Presencia: *${presence}*`
+Este número está registrado y operativo.`
     );
 };
 
