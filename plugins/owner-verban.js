@@ -13,19 +13,19 @@ let handler = async (m, { conn, args }) => {
     let presence = false;
     let raw = "";
 
-    // ===== EXISTE (REGISTRO HISTÓRICO) =====
+    // ===== EXISTE =====
     try {
         const w = await conn.onWhatsApp(jid);
         exists = !!(w?.[0]?.exists);
     } catch {}
 
-    // ===== FOTO DE PERFIL (INDICADOR FUERTE DE ACTIVIDAD) =====
+    // ===== FOTO =====
     try {
-        await conn.profilePictureUrl(jid, 'image');
+        await conn.profilePictureUrl(jid, "image");
         pp = true;
     } catch {}
 
-    // ===== ESTADO / INFO =====
+    // ===== STATUS =====
     try {
         await conn.fetchStatus(jid);
         status = true;
@@ -37,7 +37,7 @@ let handler = async (m, { conn, args }) => {
         presence = true;
     } catch {}
 
-    // ===== ASSERT (REGISTRO ACTUAL REAL) =====
+    // ===== ASSERT =====
     try {
         await conn.assertJidExists(jid);
         assert = true;
@@ -46,41 +46,13 @@ let handler = async (m, { conn, args }) => {
     }
 
     // =======================================================
-    //      🔴 SOPORTE TEMPORAL / PERMANENTE
+    //      🔴 SOPORTE (TEMPORAL + PERMANENTE)
     // =======================================================
-    if (exists && !assert) {
-
-        // Evitar falsos positivos
-        if (
-            raw.includes("spam") ||
-            raw.includes("check") ||
-            raw.includes("retry") ||
-            raw.includes("block")
-        ) {
-            return m.reply(
-`📱 Número: https://wa.me/${number}
-
-🟢 *ESTADO: ACTIVO*
-(WhatsApp respondió con revisión, pero NO está en soporte ni eliminado)`
-            );
-        }
-
+    if (exists && !assert && !pp && !status && !presence) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-❌ *ESTADO: ESTE NÚMERO ESTÁ EN SOPORTE DE WHATSAPP*
-
-WhatsApp lo marca como:
-*"Este número ya no está registrado"*
-
-Puede ser:
-• Revisión temporal  
-• Revisión permanente  
-• Proceso interno de soporte
-
-🔎 Indicadores:
-• Registro histórico: *${exists}*
-• Registro actual: *${assert}*`
+❌ *ESTE NÚMERO ESTÁ EN SOPORTE DE WHATSAPP*`
         );
     }
 
@@ -96,31 +68,24 @@ Puede ser:
     }
 
     // =======================================================
-    //      🟢 ACTIVO (VALIDACIONES COMPLETAS)
+    //      🟢 ACTIVO (MISMA LÓGICA QUE TU CÓDIGO ORIGINAL)
     // =======================================================
-    if (exists && (assert || pp || status || presence)) {
+    if (exists && (pp || status || assert || presence)) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
 🟢 *ESTADO: ACTIVO*
-
-✔ assert (registro actual): ${assert}  
-✔ foto: ${pp}  
-✔ estado: ${status}  
-✔ presencia: ${presence}  
-
-Este número está correctamente registrado y operativo.`
+• Foto: ${pp}
+• Status: ${status}
+• assertJid: ${assert}
+• Presencia: ${presence}`
         );
     }
 
-    // =======================================================
-    //      🟡 INDETERMINADO
-    // =======================================================
     return m.reply(
 `📱 Número: https://wa.me/${number}
 
-⚪ *ESTADO: INDETERMINADO*
-Algunas pruebas no coinciden.`
+⚪ *ESTADO: INDETERMINADO*`
     );
 };
 
