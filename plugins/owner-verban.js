@@ -7,17 +7,30 @@ let handler = async (m, { conn, args }) => {
     await m.reply(`🔍 *Analizando número en WhatsApp...*`);
 
     let exists = false;
+    let active = false;
 
     try {
         const w = await conn.onWhatsApp(jid);
         exists = !!(w?.[0]?.exists);
     } catch {}
 
-    if (exists) {
+    try {
+        await conn.profilePictureUrl(jid, "image");
+        active = true;
+    } catch {}
+
+    if (!active) {
+        try {
+            await conn.fetchStatus(jid);
+            active = true;
+        } catch {}
+    }
+
+    if (active) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-🟢 *ESTÁ ACTUALMENTE REGISTRADO EN WHATSAPP*`
+🟢 *ACTUALMENTE REGISTRADO EN WHATSAPP*`
         );
     }
 
