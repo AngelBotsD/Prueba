@@ -1,5 +1,5 @@
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52 899 155 5766`);
+    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52`);
 
     const number = args.join(" ").replace(/\D/g, "");
     const jid = number + "@s.whatsapp.net";
