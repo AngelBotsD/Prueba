@@ -13,31 +13,26 @@ let handler = async (m, { conn, args }) => {
     let presence = false;
     let raw = "";
 
-    // ===== EXISTE =====
     try {
         const w = await conn.onWhatsApp(jid);
         exists = !!(w?.[0]?.exists);
     } catch {}
 
-    // ===== FOTO =====
     try {
         await conn.profilePictureUrl(jid, "image");
         pp = true;
     } catch {}
 
-    // ===== STATUS =====
     try {
         await conn.fetchStatus(jid);
         status = true;
     } catch {}
 
-    // ===== PRESENCIA =====
     try {
         await conn.presenceSubscribe(jid);
         presence = true;
     } catch {}
 
-    // ===== ASSERT =====
     try {
         await conn.assertJidExists(jid);
         assert = true;
@@ -45,10 +40,11 @@ let handler = async (m, { conn, args }) => {
         raw = (e?.message || "").toLowerCase();
     }
 
-    // =======================================================
-    //      🔴 SOPORTE (TEMPORAL + PERMANENTE)
-    // =======================================================
-    if (exists && !assert && !pp && !status && !presence) {
+    if (
+        exists &&
+        !assert &&
+        raw.match(/(not.allowed|not-allowed|temporary|retry|unreg|does not|no record|restricted|banned|blocked|removed|number.*not|invalid|gone)/i)
+    ) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
@@ -56,9 +52,6 @@ let handler = async (m, { conn, args }) => {
         );
     }
 
-    // =======================================================
-    //      🔴 NO EXISTE
-    // =======================================================
     if (!exists && !assert) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
@@ -67,9 +60,6 @@ let handler = async (m, { conn, args }) => {
         );
     }
 
-    // =======================================================
-    //      🟢 ACTIVO (MISMA LÓGICA QUE TU CÓDIGO ORIGINAL)
-    // =======================================================
     if (exists && (pp || status || assert || presence)) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
