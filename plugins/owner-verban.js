@@ -1,25 +1,22 @@
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52`);
+    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52 722 758 4934`);
 
     const number = args.join(" ").replace(/\D/g, "");
     const jid = number + "@s.whatsapp.net";
 
-    await m.reply(`🔍 *Analizando número...*`);
+    await m.reply(`🔍 *Analizando número en WhatsApp...*`);
 
     let exists = false;
     let assert = false;
-    let pp = false;
-    let status = false;
-    let presence = false;
     let raw = "";
 
-    // -------- EXISTE O NO --------
+    // ---------- EXISTE (REGISTRO HISTÓRICO) ----------
     try {
         const wa = await conn.onWhatsApp(jid);
         exists = !!(wa?.[0]?.exists);
     } catch (e) {}
 
-    // -------- ASSERT (VALIDACIÓN REAL DEL ESTADO ACTUAL) --------
+    // ---------- ASSERT (VALIDACIÓN REAL DEL ESTADO ACTUAL) ----------
     try {
         await conn.assertJidExists(jid);
         assert = true;
@@ -27,42 +24,48 @@ let handler = async (m, { conn, args }) => {
         raw = e?.message || "";
     }
 
-    // SI ASSERT FALLA PERO EXISTE → REVISIÓN TEMPORAL / PERMANENTE
+    // =========================
+    // 🚫 SOPORTE (TEMPORAL/PERMANENTE)
+    // =========================
     if (exists && !assert) {
         return m.reply(
-`📱 *Número:* https://wa.me/${number}
+`📱 Número: https://wa.me/${number}
 
-🟠 *ESTADO: REVISIÓN / BLOQUEO*
+❌ *ESTADO: ESTE NÚMERO ESTÁ EN SOPORTE DE WHATSAPP*
+WhatsApp lo muestra como:
 
-WhatsApp reporta:
-❌ *"Este número ya no está registrado"*  
+*"Este número ya no está registrado"*
+
 Esto ocurre cuando:
-- El número está en revisión temporal
-- El número está en revisión permanente
-- WhatsApp limitó todas las consultas internas
+- Está en revisión temporal
+- Está en revisión permanente
+- Está bajo proceso de soporte interno
 
 🧪 Indicadores:
-▪ exists (registro histórico): *${exists}*
-▪ assertJidExists (registro actual): *${assert}*`
+▪ Registro histórico (exists): *${exists}*
+▪ Registro actual (assert): *${assert}*`
         );
     }
 
-    // SI NO EXISTE EN NINGÚN LADO
+    // =========================
+    // 🚫 NO EXISTE NI REGISTRADO NI HISTÓRICO
+    // =========================
     if (!exists && !assert) {
         return m.reply(
-`📱 *Número:* https://wa.me/${number}
+`📱 Número: https://wa.me/${number}
 
-❌ *ESTE NÚMERO NO ESTÁ REGISTRADO EN WHATSAPP*
-No existe un registro actual ni histórico.`
+❌ *NO ESTÁ REGISTRADO EN WHATSAPP*`
         );
     }
 
-    // -------- SI LLEGA AQUI → ACTIVO --------
+    // =========================
+    // 🟢 ACTIVO
+    // =========================
     return m.reply(
-`📱 *Número:* https://wa.me/${number}
+`📱 Número: https://wa.me/${number}
 
 🟢 *ESTADO: ACTIVO*
-Este número está registrado y operativo.`
+Este número está correctamente registrado y operativo.`
     );
 };
 
