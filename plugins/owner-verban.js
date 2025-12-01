@@ -7,32 +7,70 @@ let handler = async (m, { conn, args }) => {
     await m.reply(`🔍 *Analizando número en WhatsApp...*`);
 
     let exists = false;
+    let statusOk = false;
+    let presenceOk = false;
 
+    // --- 1) Verificación principal ---
     try {
         const info = await conn.onWhatsApp(number);
         exists = info?.[0]?.exists || false;
     } catch {}
 
+    // --- 2) Status (cuenta activa responde) ---
+    try {
+        const s = await conn.fetchStatus(jid);
+        if (s?.status !== undefined) statusOk = true;
+    } catch {}
+
+    // --- 3) Presence (solo cuentas activas responden) ---
+    try {
+        const p = await conn.requestPresenceUpdate(jid);
+        if (p) presenceOk = true;
+    } catch {}
+
+    // --------------------------------------------------------------------
+    // 🔥 LÓGICA PERFECTA
+    // --------------------------------------------------------------------
+
+    // ❌ NO REGISTRADO (no existe ni responde nada)
     if (!exists) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-❌ *NO REGISTRADO EN WHATSAPP*
-
-📌 Esto incluye:
-- Número no existente
-- Revisión temporal
-- Revisión permanente
-- Suspensión o ban permanente
-
-WhatsApp los trata a todos como “no registrados”.`
+❌ *NO REGISTRADO EN WHATSAPP*`
         );
     }
 
-    return m.reply(
+    // 🟡 REVISIÓN TEMPORAL
+    if (exists && !statusOk && !presenceOk) {
+        return m.reply(
+`📱 Número: https://wa.me/${number}
+
+🟡 *EN REVISIÓN TEMPORAL POR WHATSAPP*
+📌 Existe, pero el servidor bloquea:
+- Estado
+- Presencia
+- Información pública
+
+✔ Esto SOLO pasa cuando WhatsApp lo está revisando.`
+        );
+    }
+
+    // 🟢 ACTIVO
+    if (exists && (statusOk || presenceOk)) {
+        return m.reply(
 `📱 Número: https://wa.me/${number}
 
 🟢 *REGISTRADO Y ACTIVO EN WHATSAPP*`
+        );
+    }
+
+    // 🔴 SUSPENDIDO / BAN
+    return m.reply(
+`📱 Número: https://wa.me/${number}
+
+🔴 *SUSPENDIDO O ELIMINADO*
+📌 Existe en registros, pero no responde ninguna API.`
     );
 };
 
