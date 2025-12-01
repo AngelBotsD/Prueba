@@ -40,11 +40,7 @@ let handler = async (m, { conn, args }) => {
         raw = (e?.message || "").toLowerCase();
     }
 
-    if (
-        exists &&
-        !assert &&
-        raw.match(/(not.allowed|not-allowed|temporary|retry|unreg|does not|no record|restricted|banned|blocked|removed|number.*not|invalid|gone)/i)
-    ) {
+    if (exists && !assert && !pp && !status && !presence) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
