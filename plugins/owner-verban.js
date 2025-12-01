@@ -4,116 +4,124 @@ let handler = async (m, { conn, args }) => {
     const number = args.join(" ").replace(/\D/g, "");
     const jid = number + "@s.whatsapp.net";
 
-    await m.reply(`🔍 *Analizando número con 7 métodos internos...*`);
+    await m.reply(`🔍 *Analizando número actual en WhatsApp...*`);
 
-    let report = {
-        exists: false,
-        pp: false,
-        status: false,
-        assert: false,
-        presence: false,
-        blockList: true,
-        tmpError: false,
-        permError: false,
-        raw: ""
-    };
+    let existsNow = false;
+    let pp = false;
+    let status = false;
+    let assert = false;
+    let presence = false;
+    let rawError = "";
+
+    // =============================
+    // 🔍 PRUEBA PRINCIPAL: REGISTRO ACTUAL
+    // =============================
+    try {
+        const wa = await conn.onWhatsApp(jid);
+        existsNow = !!(wa && wa[0] && wa[0].exists);
+    } catch (e) {
+        rawError = e?.message || "";
+    }
+
+    // SI NO ESTÁ REGISTRADO → MENSAJE DIRECTO
+    if (!existsNow) {
+        return m.reply(
+`📱 Número: https://wa.me/${number}
+
+❌ *ESTE NÚMERO YA NO ESTÁ REGISTRADO EN WHATSAPP*
+No tiene un registro activo en la base de datos de WhatsApp.
+
+🧪 Esto significa:
+- Puede haber sido baneado permanentemente
+- Puede haber sido reciclado por la compañía telefónica
+- O simplemente jamás fue una cuenta activa`
+        );
+    }
+
+    // =============================
+    // 🔍 PRUEBAS ADICIONALES
+    // =============================
 
     try {
-        try {
-            const wa = await conn.onWhatsApp(jid);
-            report.exists = !!(wa && wa[0] && wa[0].exists);
-        } catch {}
+        await conn.profilePictureUrl(jid, 'image');
+        pp = true;
+    } catch {}
 
-        try {
-            await conn.profilePictureUrl(jid, 'image');
-            report.pp = true;
-        } catch {}
+    try {
+        await conn.fetchStatus(jid);
+        status = true;
+    } catch {}
 
-        try {
-            await conn.fetchStatus(jid);
-            report.status = true;
-        } catch {}
+    try {
+        await conn.assertJidExists(jid);
+        assert = true;
+    } catch {}
 
-        try {
-            await conn.assertJidExists(jid);
-            report.assert = true;
-        } catch {}
+    try {
+        await conn.presenceSubscribe(jid);
+        presence = true;
+    } catch {}
 
-        try {
-            await conn.presenceSubscribe(jid);
-            report.presence = true;
-        } catch {}
+    // =============================
+    // 🔥 DETECCIÓN DE BLOQUEO
+    // =============================
 
-        try {
-            await conn.fetchBlocklist();
-            report.blockList = true;
-        } catch {}
+    let temporal = false;
+    let permanente = false;
 
-    } catch (err) {
-        report.raw = err?.message || "";
+    // BLOQUEO PERMANENTE (cuenta existe pero backend la rechaza)
+    if (!pp && !status && !assert && presence === false) {
+        permanente = true;
     }
 
-    const msg = report.raw.toLowerCase();
-    report.tmpError = /temporar|not-allowed|retry|too many/i.test(msg);
-    report.permError = /404|unreg|does not|no record/i.test(msg);
-
-    // ========================================
-    // 🔥 UNIFICACIÓN TEMPORAL + PERMANENTE
-    // ========================================
-
-    let flagBan = false;
-    let tipoBan = "";
-
-    // PERMANENTE
-    if (!report.exists && !report.pp && !report.assert) {
-        flagBan = true;
-        tipoBan = "🔴 *BLOQUEO PERMANENTE*";
+    // BLOQUEO TEMPORAL (limitado pero aún con registro válido)
+    if (!permanente && existsNow && !presence && !status) {
+        temporal = true;
     }
 
-    // TEMPORAL
-    if (!flagBan && report.exists && !report.presence && !report.status && !report.permError) {
-        flagBan = true;
-        tipoBan = "🟠 *BLOQUEO TEMPORAL*";
-    }
-
-    if (flagBan) {
+    if (permanente) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-${tipoBan}
-▪ Existe: *${report.exists}*
-▪ Foto: *${report.pp}*
-▪ Status: *${report.status}*
-▪ assertJid: *${report.assert}*
-▪ Presencia: *${report.presence}*
+🔴 *BLOQUEO PERMANENTE DETECTADO*
+El número aparece registrado, pero WhatsApp no permite consultas internas.
 
-🧪 *Diagnóstico unificado para cuentas bloqueadas*
-Este número presenta fallas internas que indican un bloqueo en WhatsApp.
-
-🔎 *Precisión aproximada:* 95%`
+🧪 Indicadores:
+▪ Foto: *${pp}*
+▪ Status: *${status}*
+▪ assertJid: *${assert}*
+▪ Presencia: *${presence}*`
         );
     }
 
-    // ACTIVO
-    if (report.exists && (report.pp || report.status || report.assert)) {
+    if (temporal) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-🟢 *ESTADO: ACTIVO (NO BANEADO)*
-▪ Verificación completa exitosa
+🟠 *BLOQUEO TEMPORAL DETECTADO*
+El número existe, pero WhatsApp limita consultas internas temporalmente.
 
-🔎 *Precision:* 97%`
+🧪 Indicadores:
+▪ Foto: *${pp}*
+▪ Status: *${status}*
+▪ assertJid: *${assert}*
+▪ Presencia: *${presence}*`
         );
     }
 
-    // INDETERMINADO
+    // =============================
+    // 🟢 ACTIVO
+    // =============================
     return m.reply(
 `📱 Número: https://wa.me/${number}
 
-⚪ *ESTADO: INDETERMINADO*
-Algunas pruebas no coinciden.
+🟢 *ESTADO: ACTIVO*
+Este número está registrado actualmente en WhatsApp.
 
-🔎 *Precision:* 50%`
+▪ Foto: *${pp}*
+▪ Status: *${status}*
+▪ assertJid: *${assert}*
+▪ Presencia: *${presence}*`
     );
 };
 
