@@ -8,10 +8,6 @@ let handler = async (m, { conn, args }) => {
 
     let exists = false;
     let assert = false;
-    let pp = false;
-    let status = false;
-    let presence = false;
-    let raw = "";
 
     try {
         const w = await conn.onWhatsApp(jid);
@@ -19,32 +15,17 @@ let handler = async (m, { conn, args }) => {
     } catch {}
 
     try {
-        await conn.profilePictureUrl(jid, "image");
-        pp = true;
-    } catch {}
-
-    try {
-        await conn.fetchStatus(jid);
-        status = true;
-    } catch {}
-
-    try {
-        await conn.presenceSubscribe(jid);
-        presence = true;
-    } catch {}
-
-    try {
         await conn.assertJidExists(jid);
         assert = true;
-    } catch (e) {
-        raw = (e?.message || "").toLowerCase();
-    }
+    } catch {}
 
-    if (exists && !assert && !pp && !status && !presence) {
+    if (exists && !assert) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-❌ *ESTE NÚMERO ESTÁ EN SOPORTE DE WHATSAPP*`
+❌ *ESTE NÚMERO ESTÁ EN SOPORTE DE WHATSAPP*
+
+El número existió antes, pero actualmente no está registrado.`
         );
     }
 
@@ -56,22 +37,11 @@ let handler = async (m, { conn, args }) => {
         );
     }
 
-    if (exists && (pp || status || assert || presence)) {
-        return m.reply(
-`📱 Número: https://wa.me/${number}
-
-🟢 *ESTADO: ACTIVO*
-• Foto: ${pp}
-• Status: ${status}
-• assertJid: ${assert}
-• Presencia: ${presence}`
-        );
-    }
-
     return m.reply(
 `📱 Número: https://wa.me/${number}
 
-⚪ *ESTADO: INDETERMINADO*`
+🟢 *ESTADO: ACTIVO*
+Actualmente está registrado y operativo.`
     );
 };
 
