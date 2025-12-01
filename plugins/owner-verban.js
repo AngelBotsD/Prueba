@@ -8,7 +8,6 @@ let handler = async (m, { conn, args }) => {
 
     let exists = false;
     let assert = false;
-    let raw = "";
 
     try {
         const w = await conn.onWhatsApp(jid);
@@ -18,23 +17,26 @@ let handler = async (m, { conn, args }) => {
     try {
         await conn.assertJidExists(jid);
         assert = true;
-    } catch (e) {
-        raw = (e?.message || "").toLowerCase();
-    }
+    } catch {}
 
-    const unregistered = raw.match(/(not.allowed|not-allowed|temporary|retry|unreg|does.not|no.record|not.registered|support|spam|blocked|restricted)/i);
+    if (exists && assert) {
+        return m.reply(
+`📱 Número: https://wa.me/${number}
+
+🟢 *ESTADO: ACTUALMENTE REGISTRADO*`
+        );
+    }
 
     if (exists && !assert) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
-❌ *ESTE NÚMERO ESTÁ EN SOPORTE DE WHATSAPP*
-
-El número existió antes, pero actualmente no está registrado.`
+❌ *ESTE NÚMERO ESTÁ EN SOPORTE*
+Existió antes, pero actualmente no está registrado.`
         );
     }
 
-    if (!exists && (!assert || unregistered)) {
+    if (!exists && !assert) {
         return m.reply(
 `📱 Número: https://wa.me/${number}
 
@@ -45,8 +47,7 @@ El número existió antes, pero actualmente no está registrado.`
     return m.reply(
 `📱 Número: https://wa.me/${number}
 
-🟢 *ESTADO: ACTIVO*
-Actualmente está registrado y operativo.`
+⚪ *ESTADO INDETERMINADO*`
     );
 };
 
