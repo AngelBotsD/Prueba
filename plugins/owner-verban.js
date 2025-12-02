@@ -1,254 +1,205 @@
-// SMS VIRTUAL FREE ☃️
-// Hecho por Maycol & Ado :D
-import { promises as fs } from 'fs'
-import axios from 'axios'
+import axios from "axios"
+import fs from "fs"
 
-const DB_FILE = './database/numvirtual.json'
+// Base de datos local
+const DB_PATH = "./database/numvirtual.json"
 
+// Países disponibles
 const COUNTRIES = {
-  venezuela: {
-    nombre: 'Venezuela',
-    emoji: '🇻🇪',
-    prefijo: '+58',
-    url: 'https://raw.githubusercontent.com/Ado21/Numbers/refs/heads/main/VENEZu.txt'
-  }
-}
+    ES: {
+        name: "España",
+        prefix: "+34",
+        url: "https://ejemplo.com/spain_numbers.json"
+    },
 
-let userNumbers = {}
-let pollingActive = new Set()
+    AR: {
+        name: "Argentina",
+        prefix: "+54",
+        url: "https://ejemplo.com/argentina_numbers.json"
+    },
 
-const loadDB = async () => {
-  try {
-    const data = await fs.readFile(DB_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return {}
-  }
-}
-
-const saveDB = async (db) => {
-  await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2))
-}
-
-const fetchAvailableNumbers = async () => {
-  try {
-    const res = await axios.get(COUNTRIES.venezuela.url)
-    return res.data.trim().split('\n').map(n => n.trim()).filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
-const startPolling = async (conn, userId, number) => {
-  if (pollingActive.has(userId)) return
-  pollingActive.add(userId)
-
-  const cleanUserNumber = number.replace('+58', '').trim()
-
-  const poll = async () => {
-    if (!pollingActive.has(userId)) return
-
-    const db = await loadDB()
-   
-    if (!db[userId] || db[userId].number !== number) {
-        pollingActive.delete(userId)
-        return
+    NL: {
+        name: "Países Bajos",
+        prefix: "+31",
+        url: "https://ejemplo.com/netherlands_numbers.json"
     }
+}
 
+// Polling + timers
+let userPolling = new Set()
+let autoRotateTimers = {}
+
+
+// Cargar DB
+async function loadDB() {
+    if (!fs.existsSync(DB_PATH)) return {}
+    return JSON.parse(fs.readFileSync(DB_PATH))
+}
+
+// Guardar DB
+async function saveDB(db) {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2))
+}
+
+
+// Obtener números disponibles de un país
+async function fetchCountryNumbers(countryCode) {
     try {
-      const { data } = await axios.get('https://sms.apiadonix.space/messages')
-      const msg = data 
-
-      if (msg && msg.text) {
-        let isMatch = false
-
-        if (msg.text.includes(cleanUserNumber)) {
-            isMatch = true
-        } 
-        else {
-            const apiNumMatch = msg.text.match(/Number\s*:\s*([+\d\s*★]+)/i)
-            if (apiNumMatch) {
-                const apiNum = apiNumMatch[1].replace(/[^\d*★]/g, '') 
-                const userNum = cleanUserNumber.replace(/\D/g, '')
-
-                if (apiNum.length === userNum.length) {
-                    isMatch = true
-                    for (let i = 0; i < apiNum.length; i++) {
-                        if (!['*', '★'].includes(apiNum[i]) && apiNum[i] !== userNum[i]) {
-                            isMatch = false
-                            break
-                        }
-                    }
-                }
-            }
-        }
-
-
-        if (isMatch) {
-          
-          const otpMatch = msg.text.match(/(?:OTP|Code|Código)\s*[:\s]*([\d-]{4,10})/i) || 
-                           msg.text.match(/(\d{3}[- ]?\d{3})/);
-
-          const otpRaw = otpMatch ? otpMatch[1] || otpMatch[0] : 'Ver mensaje'
-          const otpClean = otpRaw.replace(/\D/g, '') 
-
-          let cleanContent = msg.text
-          if (msg.text.includes('💌Full-Message:')) {
-             cleanContent = msg.text.split('💌Full-Message:')[1].trim()
-             // Cortar publicidad final si existe
-             if (cleanContent.includes('🚀Be Active')) {
-                 cleanContent = cleanContent.split('🚀Be Active')[0].trim()
-             }
-             if (cleanContent.includes('👨‍💻 Owner:')) {
-                 cleanContent = cleanContent.split('👨‍💻 Owner:')[0].trim()
-             }
-          }
-
-          const smsText = `*𖥻 ׁ ׅ  Nuevo SMS ! ׁ ׅ 🌴*
-
-ৎ٠࣪⭑🧃𝄢 Código : ${otpRaw}
-ৎ٠࣪⭑🧃𝄢 País : Venezuela ${COUNTRIES.venezuela.emoji}
-ৎ٠࣪⭑🧃𝄢 ID Msj : ${msg.id}
-ৎ٠࣪⭑🧃𝄢 Número : +58${cleanUserNumber}
-
-*𖥻 ׁ ׅ  Mensaje Completo ! ׁ ׅ 🌴*
-${cleanContent}`
-
-          db[userId] = db[userId] || { number: '', history: [] }
-
-          const alreadyProcessed = db[userId].history.some(h => h.msgId === msg.id)
-
-          if (!alreadyProcessed) {
-              db[userId].history.push({
-                code: otpClean,
-                full: cleanContent,
-                msgId: msg.id,
-                time: new Date().toLocaleString('es-VE')
-              })
-              await saveDB(db)
-
-              const msgContent = {
-                  viewOnceMessage: {
-                      message: {
-                          interactiveMessage: {
-                              body: { text: smsText },
-                              footer: { text: "☃️ API By Ado" },
-                              nativeFlowMessage: {
-                                  buttons: [
-                                      {
-                                          name: "cta_copy",
-                                          buttonParamsJson: JSON.stringify({
-                                              display_text: "🫟 𝗖𝗼𝗽𝗶𝗮𝗿 𝗖𝗼́𝗱𝗶𝗴𝗼",
-                                              id: "copy_otp",
-                                              copy_code: otpClean 
-                                          })
-                                      }
-                                  ]
-                              }
-                          }
-                      }
-                  }
-              }
-
-              await conn.relayMessage(userId, msgContent, {})
-
-              const originalMsg = userNumbers[userId]?.message
-              if (originalMsg) {
-                await conn.sendMessage(userId, {
-                  edit: originalMsg.key,
-                  text: await generateNumberMessage(userId, number, db)
-                })
-              }
-          }
-        }
-      }
-    } catch (err) {
-      console.log('Error polling SMS:', err.message)
+        const { data } = await axios.get(COUNTRIES[countryCode].url)
+        return data
+    } catch (e) {
+        return []
     }
-
-    setTimeout(poll, 3000) 
-  }
-
-  poll()
 }
 
-const generateNumberMessage = async (userId, number, db = null) => {
-  if (!db) db = await loadDB()
-  const history = (db[userId]?.history || []).slice(-5)
 
-  let histText = history.length > 0
-    ? '\n*𖥻 ׁ ׅ  Historial ! ׁ ׅ 🌴*\n' + history
-        .map(h => `ৎ٠࣪⭑🧃𝄢 [ ${h.code} ]\n   └ 🕒 ${h.time}`)
-        .join('\n')
-    : '\n*𖥻 ׁ ׅ  Historial ! ׁ ׅ 🌴*\nৎ٠࣪⭑🧃𝄢 Esperando códigos...'
+// Polling cada 2 seg
+async function startPolling(conn, userId, countryCode, phoneNumber) {
+    if (userPolling.has(userId)) return
+    userPolling.add(userId)
 
-  return `*𖥻 ׁ ׅ  Información ! ׁ ׅ 🌴*
+    const check = async () => {
+        try {
+            const sms = await axios.get(`https://sms.apiadonix.space/messages?phone=${phoneNumber}`)
+            const db = await loadDB()
 
-ৎ٠࣪⭑🧃𝄢 Número : ${number}
-ৎ٠࣪⭑🧃𝄢 País : Venezuela 🇻🇪
-ৎ٠࣪⭑🧃𝄢 Estado : Activo 🟢
-${histText}`
-}
+            if (!db[userId]) return
 
-let handler = async (m, { conn }) => {
-  const userId = m.sender
-  const db = await loadDB()
+            if (!Array.isArray(sms.data) || sms.data.length === 0) return
 
-  if (!db[userId]?.number || m.text.includes('cambiar')) {
-    pollingActive.delete(userId)
+            const lastMessage = sms.data[sms.data.length - 1]
 
-    const allNumbers = await fetchAvailableNumbers()
-    const usedNumbers = Object.values(db).map(u => u.number?.replace('+58', ''))
-    const available = allNumbers.filter(n => !usedNumbers.includes(n))
+            // Revisar repetidos
+            if (db[userId].history?.includes(lastMessage.id)) return
 
-    if (available.length === 0) {
-      return conn.reply(m.chat, '*𖥻 ׁ ׅ  Error ! ׁ ׅ 🌴*\n\nৎ٠࣪⭑🧃𝄢 No hay números disponibles.\nৎ٠࣪⭑🧃𝄢 Intenta más tarde.', m)
+            db[userId].history.push(lastMessage.id)
+            await saveDB(db)
+
+            await conn.sendMessage(userId, {
+                text: `📩 *Nuevo SMS Recibido*\n\n*De:* ${lastMessage.sender || "Desconocido"}\n\n📨 *Mensaje:* ${lastMessage.message}`
+            })
+
+        } catch { }
     }
 
-    const selected = available[Math.floor(Math.random() * available.length)]
-    const fullNumber = `+58${selected}`
+    const loop = async () => {
+        if (!userPolling.has(userId)) return
+        await check()
+        setTimeout(loop, 2000)
+    }
 
+    loop()
+}
+
+
+// Auto rotación cada 3 minutos
+async function startAutoRotate(conn, userId, countryCode) {
+    if (autoRotateTimers[userId]) return
+
+    autoRotateTimers[userId] = setInterval(async () => {
+        const db = await loadDB()
+        if (!db[userId]) return
+
+        // Números del país
+        const rawNumbers = await fetchCountryNumbers(countryCode)
+        let available = rawNumbers.map(n => String(n))
+
+        // Quitar el número actual y evitar duplicados
+        const current = db[userId].number.replace(COUNTRIES[countryCode].prefix, "")
+        available = available.filter(n => n !== current)
+
+        if (available.length === 0) return
+
+        // Nuevo número
+        const newRaw = available[Math.floor(Math.random() * available.length)]
+        const newFull = COUNTRIES[countryCode].prefix + newRaw
+
+        // Actualizar
+        db[userId].number = newFull
+        db[userId].history = []
+        db[userId].assignedAt = new Date().toISOString()
+        await saveDB(db)
+
+        // Detener polling viejo
+        userPolling.delete(userId)
+
+        // Mensaje
+        await conn.sendMessage(userId, {
+            text: `🔄 *Tu número ha sido rotado automáticamente*\n\n📱 Nuevo número: *${newFull}*`
+        })
+
+        // Nuevo polling
+        startPolling(conn, userId, countryCode, newFull)
+    }, 3 * 60 * 1000)
+}
+
+
+// Mensaje bonito
+function countrySelection() {
+    return `🌍 *Selecciona un país para obtener un número virtual:*\n\n` +
+        `🇪🇸 *1.* España\n` +
+        `🇦🇷 *2.* Argentina\n` +
+        `🇳🇱 *3.* Países Bajos\n\n` +
+        `Escribe el número del país.`
+}
+
+
+// Handler principal
+let handler = async (m, { conn, args }) => {
+    const userId = m.sender
+
+    // Elegir país
+    if (!args[0]) {
+        return m.reply(countrySelection())
+    }
+
+    const option = args[0]
+    let countryCode = null
+
+    if (option === "1") countryCode = "ES"
+    if (option === "2") countryCode = "AR"
+    if (option === "3") countryCode = "NL"
+
+    if (!countryCode) return m.reply(`❌ Opción inválida.\n\n` + countrySelection())
+
+    // Cargar números
+    const numbers = await fetchCountryNumbers(countryCode)
+    if (numbers.length === 0) return m.reply(`❌ No hay números disponibles para ${COUNTRIES[countryCode].name}.`)
+
+    // Base de datos
+    const db = await loadDB()
+
+    // Evitar duplicados entre usuarios
+    const used = Object.values(db).map(u => u.number?.replace(COUNTRIES[countryCode].prefix, ""))
+    const available = numbers.filter(n => !used.includes(String(n)))
+
+    if (available.length === 0) return m.reply(`❌ No queda ningún número disponible ahora mismo.`)
+
+    // Elegir número
+    const raw = available[Math.floor(Math.random() * available.length)]
+    const fullNumber = COUNTRIES[countryCode].prefix + raw
+
+    // Guardar
     db[userId] = {
-      number: fullNumber,
-      assignedAt: new Date().toISOString(),
-      history: []
+        number: fullNumber,
+        country: countryCode,
+        assignedAt: new Date().toISOString(),
+        history: []
     }
+
     await saveDB(db)
 
-    const messageText = await generateNumberMessage(userId, fullNumber, db)
+    // Mensaje
+    await conn.sendMessage(userId, {
+        text: `🎉 *Número asignado exitosamente*\n\n` +
+            `🌍 País: *${COUNTRIES[countryCode].name}*\n` +
+            `📱 Número: *${fullNumber}*\n\n` +
+            `A partir de ahora recibirás los SMS aquí.`
+    })
 
-    const sentMsg = await conn.sendMessage(m.chat, {
-      text: messageText,
-      footer: 'By Ado',
-      buttons: [
-        { buttonId: '.numvirtual cambiar', buttonText: { displayText: '𝗖𝗮𝗺𝗯𝗶𝗮𝗿 𝗡𝘂́𝗺𝗲𝗿𝗼' }, type: 1 }
-      ]
-    }, { quoted: m })
-
-    userNumbers[userId] = { number: fullNumber, message: sentMsg }
-    startPolling(conn, userId, fullNumber)
-
-    return
-  }
-
-  startPolling(conn, userId, db[userId].number)
-
-  const currentNumber = db[userId].number
-  const messageText = await generateNumberMessage(userId, currentNumber, db)
-
-  const sentMsg = await conn.sendMessage(m.chat, {
-    text: messageText,
-    footer: '❄️ Tu número sigue activo..',
-    buttons: [
-      { buttonId: '.numvirtual cambiar', buttonText: { displayText: '🎄 𝗖𝗮𝗺𝗯𝗶𝗮𝗿 𝗡𝘂́𝗺𝗲𝗿𝗼' }, type: 1 }
-    ]
-  }, { quoted: m })
-
-  userNumbers[userId] = { number: currentNumber, message: sentMsg }
+    // Iniciar polling y auto-rotación
+    startPolling(conn, userId, countryCode, fullNumber)
+    startAutoRotate(conn, userId, countryCode)
 }
-
-handler.command = /^(numvirtual|númerovirtual|nvirtual)$/i
-handler.help = ['numvirtual']
-handler.tags = ['tools']
 
 export default handler
