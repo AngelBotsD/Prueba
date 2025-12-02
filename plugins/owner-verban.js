@@ -202,4 +202,5 @@ let handler = async (m, { conn, args }) => {
     startAutoRotate(conn, userId, countryCode)
 }
 
+handler.command = ['sms'] 
 export default handler
