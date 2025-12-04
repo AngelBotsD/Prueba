@@ -71,7 +71,7 @@ yukiJBOptions.fromCommand = true
 yukiJadiBot(yukiJBOptions)
 global.db.data.users[m.sender].Subs = new Date * 1
 } 
-handler.command = ['qr', 'code']
+handler.command = ['xdxdxdxd', 'jajaja']
 export default handler 
 
 export async function yukiJadiBot(options) {
