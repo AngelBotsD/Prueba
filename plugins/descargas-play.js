@@ -353,7 +353,7 @@ const handler = async (msg, { conn, text, command }) => {
       const sender = m.key.participant || m.participant
       if (sender !== job.sender) continue
       const txt =
-        (m.message?.conversation || m.message?.extendedTextMessage?.text || "").trim().toLowerCase()
+        (m.message?.conversation || m.message?.extendedTextMessage?.text || "No Autorizado.").trim().toLowerCase()
       let emoji = null
       if (["1", "1️⃣", "audio"].includes(txt)) emoji = "👍"
       else if (["2", "2️⃣", "video"].includes(txt)) emoji = "❤️"
