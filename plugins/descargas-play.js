@@ -325,7 +325,7 @@ const handler = async (msg, { conn, text, command }) => {
         if (!job || !["👍", "❤️", "📄", "📁"].includes(emoji)) continue
         if ((sender || m.key.participant) !== job.sender) {
           try {
-            await conn.sendMessage(job.chatId, { text: "❌ No autorizado." }, { quoted: job.commandMsg })
+            await conn.sendMessage(job.chatId, { text: "" }, { quoted: job.commandMsg })
           } catch {}
           continue
         }
