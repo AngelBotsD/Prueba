@@ -26,7 +26,7 @@ var handler = async (m, { conn, text, args }) => {
     if (!name2) return conn.reply(m.chat, `🚩 *Escribe el nombre de la segunda persona*`, m)
   }
 
-  let lovePercent = Math.floor(Math.random() * 100)
+  let lovePercent = Math.floor(Math.random() * 999)
 
   let loveMsg = `❤️ *${name1}* y *${name2}*\n\n✨ Su porcentaje de amor es de *${lovePercent}%* 👩🏻‍❤️‍👨🏻`
 
