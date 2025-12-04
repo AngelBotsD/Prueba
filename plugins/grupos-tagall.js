@@ -71,8 +71,8 @@ const handler = async (msg, { conn }) => {
     const total = mentionIds.length;
 
     let texto = `*!  MENCION GENERAL  !*\n`;
-    texto += `   *PARA ${total} MIEMBROS* 📲\n\n`;
-    texto += mentionIds.map(id => `┊» 📲 @${id.split("@")[0]}`).join("\n");
+    texto += `   *PARA ${total} MIEMBROS* 🚩\n\n`;
+    texto += mentionIds.map(id => `┊» 🚩 @${id.split("@")[0]}`).join("\n");
 
     await conn.sendMessage(chatId, { text: texto, mentions: mentionIds }, { quoted: msg });
 
