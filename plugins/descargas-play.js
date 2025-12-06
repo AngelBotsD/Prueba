@@ -13,7 +13,7 @@ if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true })
 
 const CACHE_FILE = path.join(TMP_DIR, "cache.json")
 const SKY_BASE = process.env.API_BASE || "https://api-sky.ultraplus.click"
-const SKY_KEY = process.env.API_KEY || "Neveloop"
+const SKY_KEY = process.env.API_KEY || "Neveloopp"
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT) || 3
 const MAX_FILE_MB = Number(process.env.MAX_FILE_MB) || 99
 const DOWNLOAD_TIMEOUT = Number(process.env.DOWNLOAD_TIMEOUT) || 60000
