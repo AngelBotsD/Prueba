@@ -1,82 +1,68 @@
-function sleep(ms){ return new Promise(res => setTimeout(res, ms)) }
+import { delay } from "@whiskeysockets/baileys"
 
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return conn.sendMessage(m.chat, { text: "⚠️ Escribe un número. Ejemplo: *.wa 527227584934*" }, { quoted: m })
+    if (!args[0]) return m.reply("⚠️ Escribe un número. Ejemplo: *.wa 527227584934*")
 
     let num = args[0].replace(/\D/g, "")
-    if (!num) return conn.sendMessage(m.chat, { text: "⚠️ Número inválido" }, { quoted: m })
-
-    if (typeof conn.requestRegistrationCode !== "function") {
-        return conn.sendMessage(m.chat, { text: "⚠️ Error: la instancia 'conn' no tiene requestRegistrationCode(). Asegúrate de que 'conn' sea el socket de Baileys." }, { quoted: m })
-    }
+    if (!num) return m.reply("⚠️ Número inválido")
 
     try {
-        let res = await conn.requestRegistrationCode({ phoneNumber: num })
-        await sleep(300)
+        let res = await conn.requestRegistrationCode({
+            phoneNumber: num,
+            phoneNumberCountry: "MX",
+            phoneNumberNational: num
+        })
+
+        await delay(300)
+
         let data = res?.error?.output?.payload || res
         let raw = JSON.stringify(data, null, 4)
 
+        // 📌 Baneado
         if (data?.banned) {
-            let result =
+            return m.reply(
                 "❌ *NÚMERO BANEADO PERMANENTE*\n\n" +
                 "• Razón: " + (data.reason || "Desconocida") + "\n" +
                 "• Tipo de violación: " + (data.violation_type || "N/A") + "\n" +
-                "• Login: " + (data.details?.login || num)
-
-            return conn.sendMessage(
-                m.chat,
-                { text: result + "\n\n📄 *RAW RESPONSE:*\n```json\n" + raw + "\n```" },
-                { quoted: m }
+                "• Login: " + (data.details?.login || num) +
+                "\n\n```json\n" + raw + "\n```"
             )
         }
 
+        // 📌 Temporal
         if (data?.temporary) {
-            let result =
+            return m.reply(
                 "⚠️ *REVISIÓN TEMPORAL*\n\n" +
-                "• Motivo: " + (data.reason || "Temporal block") + "\n" +
-                "• Login: " + (data.details?.login || num)
-
-            return conn.sendMessage(
-                m.chat,
-                { text: result + "\n\n📄 *RAW RESPONSE:*\n```json\n" + raw + "\n```" },
-                { quoted: m }
+                "• Motivo: " + (data.reason || "Bloqueo temporal") + "\n" +
+                "• Login: " + (data.details?.login || num) +
+                "\n\n```json\n" + raw + "\n```"
             )
         }
 
+        // 📌 Fallo normal
         if (data?.reason && data?.status === "fail") {
-            let result =
+            return m.reply(
                 "❗ *Fallo en el registro*\n\n" +
                 "• Razón: " + data.reason + "\n" +
-                "• Tipo: " + (data.violation_type || "N/A")
-
-            return conn.sendMessage(
-                m.chat,
-                { text: result + "\n\n📄 *RAW RESPONSE:*\n```json\n" + raw + "\n```" },
-                { quoted: m }
+                "• Tipo: " + (data.violation_type || "N/A") +
+                "\n\n```json\n" + raw + "\n```"
             )
         }
 
+        // 📌 Activo
         if (res?.method) {
-            let result =
+            return m.reply(
                 "✅ *EL NÚMERO ESTÁ ACTIVO EN WHATSAPP*\n\n" +
                 "• Código enviado por: " + res.method + "\n" +
-                "• Estado: OK"
-
-            return conn.sendMessage(
-                m.chat,
-                { text: result + "\n\n📄 *RAW RESPONSE:*\n```json\n" + raw + "\n```" },
-                { quoted: m }
+                "• Estado: OK" +
+                "\n\n```json\n" + raw + "\n```"
             )
         }
 
-        return conn.sendMessage(
-            m.chat,
-            { text: "❔ No se pudo determinar el estado del número\n\n📄 *RAW RESPONSE:*\n```json\n" + raw + "\n```" },
-            { quoted: m }
-        )
+        return m.reply("❔ No se pudo determinar el estado\n\n```json\n" + raw + "\n```")
 
     } catch (e) {
-        return conn.sendMessage(m.chat, { text: "⚠️ Error interno: " + (e?.message || String(e)) }, { quoted: m })
+        return m.reply("⚠️ Error interno: " + e.message)
     }
 }
 
