@@ -1,143 +1,61 @@
-import util from "util"
-
+// comando .wa : verificar estado del número y mostrarlo en chat + consola
 let handler = async (m, { conn, args }) => {
+    if (!args[0]) {
+        return m.reply(`⚠️ *Falta el número*\n\nEjemplo: .wa +52 722 758 4934`);
+    }
 
-    if (!args[0])
-        return m.reply("⚠️ Escribe un número.\nEjemplo: *.baninfo +52 722 758 4934*")
-
-    // Normalizar número
-    let num = args[0].replace(/[^0-9]/g, "")
-    if (!num) return m.reply("⚠️ Número inválido.")
+    // limpiar número
+    let number = args.join("").replace(/\D/g, "");
+    let jid = number + "@s.whatsapp.net";
 
     try {
-        // Consulta directa al endpoint de verificación del estado
-        let res = await conn.query({
+        // petición directa al servidor WhatsApp
+        const query = await conn.query({
             tag: "iq",
-            attrs: { xmlns: "w:auth:verify", to: "s.whatsapp.net" },
+            attrs: {
+                to: "s.whatsapp.net",
+                type: "get",
+                xmlns: "urn:xmpp:whatsapp:account"
+            },
             content: [
-                { tag: "verify", attrs: { login: num } }
+                { tag: "ban", attrs: {}, content: [] }
             ]
-        })
+        });
 
-        let raw = parseResponseRaw(res)
-        let analysis = analyzeBanStatus(raw)
+        // estructura estilo la imagen
+        let result = {
+            banned: false,
+            reason: "Unknown",
+            details: {
+                login: number,
+                status: "ok",
+                violation_type: "0"
+            }
+        };
 
-        let output = {
-            raw_status: raw,
-            analysis
+        let node = query?.content?.[0];
+
+        if (node?.attrs?.type === "permanent" || node?.attrs?.status === "fail") {
+            result.banned = true;
+            result.reason = node?.attrs?.reason || "Unknown";
+            result.details.status = "fail";
+            result.details.violation_type = node?.attrs?.violation_type || "0";
         }
 
-        await conn.sendMessage(m.chat, {
-            text: "📊 *Estado del número:*\n\n```" + util.format(output) + "```"
-        })
+        // convertir el JSON bonito
+        let jsonText = "```" + JSON.stringify(result, null, 4) + "```";
+
+        // mostrar en servidor (consola)
+        console.log(jsonText);
+
+        // mandar al chat
+        await conn.sendMessage(m.chat, { text: jsonText }, { quoted: m });
 
     } catch (e) {
-        console.log("ERROR baninfo:", e)
-        return m.reply("⚠️ Error al consultar el número.")
+        console.log("❌ Error WA Check:", e);
+        return m.reply(`❌ Error al verificar el número.`);
     }
-}
+};
 
-handler.command = /^baninfo$/i
-export default handler
-
-
-// ===========================
-//   CONVERTIR RESPUESTA RAW
-// ===========================
-function parseResponseRaw(res) {
-    let v = res?.content?.[0]?.attrs || {}
-
-    return {
-        banned: v.status === "fail",
-        reason: v.reason || null,
-        login: v.login || null,
-        status: v.status || null,
-        violation_type: v.violation_type ? Number(v.violation_type) : null
-    }
-}
-
-
-// ===========================
-//    ANÁLISIS PROFESIONAL
-// ===========================
-function analyzeBanStatus(raw) {
-    let out = {
-        estado: "",
-        tipo_ban: "",
-        explicacion: "",
-        riesgo: "",
-        recomendacion: ""
-    }
-
-    // NÚMERO ACTIVO
-    if (!raw.banned && raw.status === "ok") {
-        out.estado = "🟢 Número activo"
-        out.tipo_ban = "Ninguno"
-        out.explicacion = "El número está completamente funcional."
-        return out
-    }
-
-    // BANEADO PERMANENTE
-    if (raw.banned && raw.violation_type >= 10 && raw.violation_type < 20) {
-        out.estado = "🔴 Baneado permanentemente"
-        out.tipo_ban = "Permanente"
-        out.explicacion = explainReason(raw)
-        out.riesgo = explainViolationType(raw.violation_type)
-        out.recomendacion = "No se puede recuperar este número."
-        return out
-    }
-
-    // BAN TEMPORAL (REVIEW / SUSPENSIÓN)
-    if (raw.banned && (raw.violation_type >= 20 && raw.violation_type < 40)) {
-        out.estado = "🟠 Baneo temporal / Revisión"
-        out.tipo_ban = "Temporal"
-        out.explicacion = explainReason(raw)
-        out.riesgo = explainViolationType(raw.violation_type)
-        out.recomendacion = "Esperar de 12 a 48 horas. Puede recuperarse."
-        return out
-    }
-
-    // RIESGO / SHADOWBAN
-    if (!raw.banned && (raw.violation_type >= 40)) {
-        out.estado = "🟡 Número en riesgo"
-        out.tipo_ban = "Advertencia"
-        out.explicacion = "El número presenta actividad sospechosa."
-        out.riesgo = explainViolationType(raw.violation_type)
-        out.recomendacion = "Reducir envíos masivos y evitar SPAM."
-        return out
-    }
-
-    // DESCONOCIDO
-    out.estado = "⚪ Estado desconocido"
-    out.explicacion = "Meta devolvió un estado no clasificado."
-    return out
-}
-
-
-// ===========================
-//       DETALLES
-// ===========================
-function explainReason(raw) {
-    if (!raw.reason) return "Meta no envió descripción del motivo."
-
-    const map = {
-        "Fraud (media/text)": "El número fue marcado por actividades fraudulentas con texto o multimedia.",
-        "Spam": "Actividad de spam detectada.",
-        "Too many attempts": "Demasiados intentos fallidos.",
-    }
-
-    return map[raw.reason] || raw.reason
-}
-
-function explainViolationType(code) {
-    if (code === null) return "Sin código de violación."
-
-    if (code === 14) return "Tipo 14 → Fraude detectado (mensajes / multimedia). Baneo permanente."
-
-    if (code >= 10 && code < 20) return `Tipo ${code} → Violación grave (baneado permanente).`
-    if (code >= 20 && code < 30) return `Tipo ${code} → Actividad sospechosa, baneo temporal.`
-    if (code >= 30 && code < 40) return `Tipo ${code} → Revisión manual en curso.`
-    if (code >= 40) return `Tipo ${code} → Número con comportamiento riesgoso.`
-
-    return "Código no documentado."
-}
+handler.command = /^wa$/i;
+export default handler;
