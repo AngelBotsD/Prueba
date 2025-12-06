@@ -1,10 +1,10 @@
 import makeWASocket, { delay } from "@whiskeysockets/baileys"
 
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply("⚠️ Escribe un número. Ejemplo: *.wa 527227584934*")
+    if (!args[0]) return conn.sendMessage(m.chat, { text: "⚠️ Escribe un número. Ejemplo: *.wa 527227584934*" })
 
     let num = args[0].replace(/\D/g, "")
-    if (!num) return m.reply("⚠️ Número inválido")
+    if (!num) return conn.sendMessage(m.chat, { text: "⚠️ Número inválido" })
 
     let sock = makeWASocket({
         logger: { fatal(){}, error(){}, warn(){}, info(){}, debug(){}, trace(){} },
@@ -12,10 +12,14 @@ let handler = async (m, { conn, args }) => {
         auth: { creds: {}, keys: {} }
     })
 
-    let res = await checkNumber(sock, num)
+    let { result, raw } = await checkNumber(sock, num)
     try { await sock.ws.close() } catch {}
 
-    return m.reply(res)
+    return conn.sendMessage(
+        m.chat,
+        { text: result + "\n\n📄 *RAW RESPONSE:*\n```json\n" + raw + "\n```" },
+        { quoted: m }
+    )
 }
 
 async function checkNumber(sock, number) {
@@ -27,44 +31,48 @@ async function checkNumber(sock, number) {
         let raw = JSON.stringify(data, null, 4)
 
         if (data?.banned) {
-            return (
-                "❌ *NÚMERO BANEADO PERMANENTE*\n\n" +
-                "• Razón: " + (data.reason || "Desconocida") + "\n" +
-                "• Tipo de violación: " + (data.violation_type || "N/A") + "\n" +
-                "• Login: " + (data.details?.login || number) +
-                "\n\n📄 *RAW:*\n```json\n" + raw + "\n```"
-            )
+            return {
+                result:
+                    "❌ *NÚMERO BANEADO PERMANENTE*\n\n" +
+                    "• Razón: " + (data.reason || "Desconocida") + "\n" +
+                    "• Tipo de violación: " + (data.violation_type || "N/A") + "\n" +
+                    "• Login: " + (data.details?.login || number),
+                raw
+            }
         }
 
         if (data?.temporary) {
-            return (
-                "⚠️ *REVISIÓN TEMPORAL*\n\n" +
-                "• Motivo: " + (data.reason || "Temporal block") + "\n" +
-                "• Login: " + (data.details?.login || number) +
-                "\n\n📄 *RAW:*\n```json\n" + raw + "\n```"
-            )
+            return {
+                result:
+                    "⚠️ *REVISIÓN TEMPORAL*\n\n" +
+                    "• Motivo: " + (data.reason || "Temporal block") + "\n" +
+                    "• Login: " + (data.details?.login || number),
+                raw
+            }
         }
 
         if (data?.reason && data?.status === "fail") {
-            return (
-                "❗ *Fallo en el registro*\n\n" +
-                "• Razón: " + data.reason + "\n" +
-                "• Tipo: " + (data.violation_type || "N/A") +
-                "\n\n📄 *RAW:*\n```json\n" + raw + "\n```"
-            )
+            return {
+                result:
+                    "❗ *Fallo en el registro*\n\n" +
+                    "• Razón: " + data.reason + "\n" +
+                    "• Tipo: " + (data.violation_type || "N/A"),
+                raw
+            }
         }
 
         if (res?.method) {
-            return (
-                "✅ *EL NÚMERO ESTÁ ACTIVO EN WHATSAPP*\n\n" +
-                "• Código enviado por: " + res.method +
-                "\n\n📄 *RAW:*\n```json\n" + raw + "\n```"
-            )
+            return {
+                result:
+                    "✅ *EL NÚMERO ESTÁ ACTIVO EN WHATSAPP*\n\n" +
+                    "• Código enviado por: " + res.method,
+                raw
+            }
         }
 
-        return "❔ No se pudo determinar el estado del número\n\nRAW:\n```json\n" + raw + "\n```"
+        return { result: "❔ No se pudo determinar el estado del número", raw }
     } catch (e) {
-        return "⚠️ Error: " + e.message
+        return { result: "⚠️ Error: " + e.message, raw: "{}" }
     }
 }
 
