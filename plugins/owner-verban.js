@@ -1,4 +1,4 @@
-import makeWASocket, { delay } from "@whiskeysockets/baileys"
+import { makeWaSocket, delay } from "@whiskeysockets/baileys"
 
 let handler = async (m, { conn, args }) => {
     if (!args[0]) return conn.sendMessage(m.chat, { text: "⚠️ Escribe un número. Ejemplo: *.wa 527227584934*" })
@@ -6,7 +6,7 @@ let handler = async (m, { conn, args }) => {
     let num = args[0].replace(/\D/g, "")
     if (!num) return conn.sendMessage(m.chat, { text: "⚠️ Número inválido" })
 
-    let sock = makeWASocket({
+    let sock = makeWaSocket({
         logger: { fatal(){}, error(){}, warn(){}, info(){}, debug(){}, trace(){} },
         printQRInTerminal: false,
         auth: { creds: {}, keys: {} }
