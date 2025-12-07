@@ -4,18 +4,35 @@ let handler = async (m, { conn, args }) => {
   let number = args.join("").replace(/\D/g, "");
   let full = number + "@s.whatsapp.net";
 
-  await m.reply("⏳ *Consultando servidores de WhatsApp...*");
+  m.reply("⏳ *Consultando servidores de WhatsApp (DS6 META)...*");
 
   try {
-    // Intento real: WhatsApp devuelve error si el número está baneado o no existe
-    await conn.assertJidExists(full);
 
-    // Si no hubo error, existe y no está baneado
-    return m.reply(`🟢 *ACTIVO ACTUALMENTE*`);
+    const res = await conn.queryBlocklistStatus(full);
+
+    const state = res?.status || "unknown";
+
+    if (state === "active") {
+      return m.reply("🟢 *ACTIVO ACTUALMENTE*");
+    }
+
+    if (state === "temporary") {
+      return m.reply("🟠 *BLOQUEO TEMPORAL DE WHATSAPP*");
+    }
+
+    if (state === "banned") {
+      return m.reply("🔴 *BANEADO PERMANENTEMENTE DE WHATSAPP*");
+    }
+
+    if (state === "invalid") {
+      return m.reply("❌ *NÚMERO NO REGISTRADO EN WHATSAPP*");
+    }
+
+    return m.reply(`⚠️ Estado desconocido: ${state}`);
 
   } catch (e) {
-    // Si WhatsApp rechaza la consulta → baneado, eliminado o inexistente
-    return m.reply(`🔴 *BANEADO DE WHATSAPP*`);
+    console.log("ERROR:", e);
+    return m.reply("❌ No se pudo consultar el estado. WhatsApp puede estar limitando.");
   }
 };
 
