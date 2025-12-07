@@ -23,6 +23,30 @@ import Pino from 'pino'
 import path, { join, dirname } from 'path'
 import { Boom } from '@hapi/boom'
 import { makeWASocket, protoType, serialize } from './lib/simple.js'
+// PATCH: Agregar consulta de estado de cuenta (baneado / activo)
+async function queryAccountStatus(conn, jid) {
+  try {
+    const iq = {
+      tag: "iq",
+      attrs: {
+        to: "s.whatsapp.net",
+        type: "get",
+        xmlns: "urn:xmpp:whatsapp:account"
+      },
+      content: [
+        {
+          tag: "account",
+          attrs: { jid }
+        }
+      ]
+    };
+
+    const res = await conn.query(iq);
+    return res;
+  } catch (err) {
+    return { error: true, err };
+  }
+}
 import { Low, JSONFile } from 'lowdb'
 import { mongoDB, mongoDBV2 } from './lib/mongoDB.js'
 import store from './lib/store.js'
