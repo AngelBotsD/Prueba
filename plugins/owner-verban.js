@@ -1,105 +1,38 @@
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo: .wa +52 722 758 4934`);
+  if (!args[0]) return m.reply(`⚠️ Ingresa un número.\nEjemplo: .wa 522233445566`);
 
-    const number = args.join(" ").replace(/\D/g, "");
-    const jid = number + "@s.whatsapp.net";
+  let number = args[0].replace(/\D/g, "");
+  let full = number + "@s.whatsapp.net";
 
-    await m.reply(`🔍 *Analizando número...*`);
+  m.reply("⏳ *Consultando directamente a WhatsApp...*");
 
-    // ------------------------
-    // 1) EXISTE?
-    // ------------------------
-    let existsNow = false;
-    try {
-        const wa = await conn.onWhatsApp(jid);
-        existsNow = !!(wa && wa[0]?.exists);
-    } catch {}
+  try {
+    const result = await conn.onWhatsApp(full);
 
-    if (!existsNow) {
-        return m.reply(`
-📱 Número: https://wa.me/${number}
-
-❌ *NO REGISTRADO EN WHATSApp*
-        `);
+    if (!result || result.length === 0) {
+      return m.reply(`❌ *WHATSAPP RESPONDE:*  
+📵 El número no está registrado o está suspendido permanentemente.`);
     }
 
-    // ------------------------
-    // 2) PRUEBAS
-    // ------------------------
-    let pp = false, status = false, assert = false, presence = false;
-    let assertErr = "";
+    const info = result[0]; // WhatsApp solo devuelve uno
+    const exists = info.exists;
 
-    try { await conn.profilePictureUrl(jid, 'image'); pp = true; } catch {}
-    try { await conn.fetchStatus(jid); status = true; } catch {}
-    
-    try { 
-        await conn.assertJidExists(jid); 
-        assert = true; 
-    } catch (e) {
-        assertErr = e?.message || "";
+    if (!exists) {
+      return m.reply(`❌ *WHATSAPP RESPONDE:*  
+📵 Número inexistente o baneado permanente.`);
     }
 
-    try { await conn.presenceSubscribe(jid); presence = true; } catch {}
-
-    // ------------------------
-    // 3) DETECCIÓN REAL DE BAN PERMANENTE para ds6/meta
-    // ------------------------
-
-    const bannedPatterns = [
-        "not-authorized",
-        "401",
-        "403",
-        "400",
-        "bad request",
-        "forbidden",
-        "unauthorized"
-    ];
-
-    const isPermanentBan =
-        assert === false &&
-        bannedPatterns.some(x => assertErr.toLowerCase().includes(x)) &&
-        !pp &&
-        !status &&
-        !presence;
-
-    if (isPermanentBan) {
-        return m.reply(`
-📱 Número: https://wa.me/${number}
-
-🔴 *BANEADO PERMANENTE POR WHATSAPP*
-
-🧪 Indicadores:
-▪ Foto: ${pp}
-▪ Status: ${status}
-▪ assertJid: ${assert}
-▪ Presencia: ${presence}
-
-🛑 Error del servidor:
-${assertErr}
-        `);
-    }
-
-    // ------------------------
-    // BLOQUEO TEMPORAL
-    // ------------------------
-    if (!status && !presence && assert === true) {
-        return m.reply(`
-📱 Número: https://wa.me/${number}
-
-🟠 *BLOQUEO TEMPORAL*
-        `);
-    }
-
-    // ------------------------
-    // ACTIVO
-    // ------------------------
-    return m.reply(`
-📱 Número: https://wa.me/${number}
-
-🟢 *ACTIVO*
-Este número está funcionando normalmente.
-    `);
+    return m.reply(`🟢 *WHATSAPP RESPONDE:*  
+✔️ El número *sí está activo*  
+📱 JID: ${info.jid}`);
+  } catch (e) {
+    console.log(e);
+    return m.reply("❌ Error al consultar WhatsApp. Intenta más tarde.");
+  }
 };
 
+handler.help = ["wa <número>"];
+handler.tags = ["tools"];
 handler.command = /^wa$/i;
+
 export default handler;
