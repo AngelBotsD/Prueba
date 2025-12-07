@@ -2,7 +2,6 @@ const handler = async (msg, { conn }) => {
   const chatId = msg.key.remoteJid
   const ctx = msg.message?.extendedTextMessage?.contextInfo
 
-  // Si NO está respondiendo al mensaje a borrar
   if (!ctx?.stanzaId) {
     await conn.sendMessage(chatId, {
       text: "Responde al mensaje que deseas eliminar."
@@ -11,7 +10,6 @@ const handler = async (msg, { conn }) => {
   }
 
   try {
-    // ELIMINAR el mensaje objetivo
     await conn.sendMessage(chatId, {
       delete: {
         remoteJid: chatId,
@@ -21,7 +19,6 @@ const handler = async (msg, { conn }) => {
       }
     })
 
-    // ELIMINAR el mensaje del usuario que ejecutó el comando
     await conn.sendMessage(chatId, {
       delete: {
         remoteJid: chatId,
