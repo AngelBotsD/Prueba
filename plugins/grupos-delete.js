@@ -36,7 +36,9 @@ const handler = async (msg, { conn }) => {
   }
 }
 
-handler.customPrefix = /^\.?(del|delete)$/i
-handler.command = new RegExp()
+handler.help = ["𝖣𝖾𝗅𝖾𝗍𝖾"];
+handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"];
+handler.customPrefix = /^\.?(del|delete)$/i;
+handler.command = new RegExp();
 
 export default handler
