@@ -1,41 +1,36 @@
-import fs from "fs"
-import path from "path"
-
 const handler = async (msg, { conn }) => {
   const chatId = msg.key.remoteJid
+  const ctx = msg.message?.extendedTextMessage?.contextInfo
 
-  if (!msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
+  // Si no está respondiendo a un mensaje → solo reaccionamos ❓
+  if (!ctx?.stanzaId) {
     await conn.sendMessage(chatId, {
-      text: "❓ *Debes responder al mensaje que deseas eliminar con el comando `.delete`.*"
-    }, { quoted: msg })
+      react: { text: "❓", key: msg.key }
+    })
     return
   }
 
-  const { stanzaId, participant } = msg.message.extendedTextMessage.contextInfo
-
   try {
+    // Eliminación DIRECTA — lo más rápido posible
     await conn.sendMessage(chatId, {
       delete: {
         remoteJid: chatId,
         fromMe: false,
-        id: stanzaId,
-        participant
+        id: ctx.stanzaId,
+        participant: ctx.participant
       }
     })
 
-    // ✔ Reacción al mensaje del usuario
+    // Reacción instantánea al mensaje que ejecutó el comando
     await conn.sendMessage(chatId, {
-      react: {
-        text: "✅",
-        key: msg.key
-      }
+      react: { text: "✅", key: msg.key }
     })
 
   } catch (e) {
-    console.error("❌ Error al eliminar mensaje:", e)
+    console.error("Error al eliminar:", e)
     await conn.sendMessage(chatId, {
-      text: "❌ *No se pudo eliminar el mensaje.*"
-    }, { quoted: msg })
+      react: { text: "❌", key: msg.key }
+    })
   }
 }
 
