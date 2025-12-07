@@ -1,60 +1,41 @@
-import fetch from "node-fetch"
-
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\n📌 Ejemplo:\n.wa +52 722 758 4934`)
+    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n\nEjemplo:\n.wa +52 722 758 4934`)
 
     let number = args.join(" ").replace(/\D/g, "")
     let jid = number + "@s.whatsapp.net"
-    let link = `https://wa.me/${number}`
 
-    await m.reply("🔍 *Analizando número...*")
+    await m.reply("🔍 Verificando con WhatsApp...")
 
-    // 1️⃣ Verificar si el número está en WhatsApp (existe)
-    let existsCheck = await conn.onWhatsApp(number)
-    let exists = existsCheck?.[0]?.exists || false
+    // 1️⃣ WhatsApp (respuesta oficial)
+    let existsData = await conn.onWhatsApp(number)
+    let exists = existsData?.[0]?.exists || false
 
-    // 2️⃣ Verificar si el número tiene estado (status)
-    let statusFail = false
-    try { await conn.fetchStatus(jid) } catch { statusFail = true }
-
-    // 3️⃣ Comprobar la página wa.me (si da error o está caída, está suspendido)
-    let suspendedByWaMe = false
+    // 2️⃣ Intento de obtener status (WhatsApp directo)
+    let statusOk = true
     try {
-        let w = await fetch(link)
-        let t = await w.text()
-        if (t.includes("invalid") || t.includes("not a valid") || w.status === 404)
-            suspendedByWaMe = true
+        await conn.fetchStatus(jid)
     } catch {
-        suspendedByWaMe = true
+        statusOk = false
     }
 
-    // Lógica final — determine el estado basado en las verificaciones
-    let score = 0
-    if (!exists) score += 2
-    if (statusFail) score += 2
-    if (suspendedByWaMe) score += 3
+    // 3️⃣ Lógica interna del servidor (precisión extra)
+    // Si WhatsApp dijo SI pero falló el status = número probablemente suspendido
+    let finalDecision = "no"
 
-    if (score >= 4) {
-        return m.reply(
-`🔴 *Número suspendido permanentemente*
-
-${link}`
-        )
+    if (exists && statusOk) {
+        finalDecision = "si"
+    } else if (exists && !statusOk) {
+        // WhatsApp lo reconoce, pero no permite consultar el status → baneo probable
+        finalDecision = "no"
+    } else {
+        finalDecision = "no"
     }
 
-    if (score >= 2) {
-        return m.reply(
-`🟠 *Número con fallas — posible suspensión*
-
-${link}`
-        )
+    if (finalDecision === "si") {
+        return m.reply(`🟢 WhatsApp: *Sí*`)
+    } else {
+        return m.reply(`🔴 WhatsApp: *No*`)
     }
-
-    return m.reply(
-`🟢 *Número activo*
-
-${link}`
-    )
 }
 
 handler.command = /^wa$/i
