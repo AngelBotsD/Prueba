@@ -1,23 +1,39 @@
 let handler = async (m, { conn, args }) => {
-    if (!args[0]) return m.reply(`⚠️ *Falta el número*\n👉 Ejemplo: .verban 5522113344`);
+  if (!args[0]) return m.reply(`⚠️ Ingresa un número.\nEjemplo: .wa 5217227584934`);
 
-    let num = args[0].replace(/\D/g, "") + "@s.whatsapp.net";
+  let number = args[0].replace(/\D/g, "");
+  let jid = number + "@s.whatsapp.net";
 
-    await m.reply("⏳ *Consultando servidores de WhatsApp...*");
+  m.reply("⏳ Consultando servidores oficiales de WhatsApp...");
 
-    try {
-        let data = await conn.onWhatsApp(num);
+  try {
+    // 1) Verificar si existe
+    const exists = await conn.onWhatsApp(jid);
 
-        if (!data || data.length === 0) {
-            return m.reply("🚫 *Baneado de WhatsApp*\nEse número no está registrado.");
-        }
-
-        return m.reply("🟢 *Activo actualmente*");
-        
-    } catch (e) {
-        return m.reply("⚠️ *Error consultando WhatsApp*\nPuede ser que el número esté caído o WhatsApp no respondió.");
+    if (!exists || !exists[0] || !exists[0].exists) {
+      return m.reply("🔴 *BANEADO DE WHATSAPP*\nNo aparece como cuenta activa.");
     }
-}
+
+    // 2) Consultar estado real (ban, motivos, etc.)
+    const status = await conn.queryAccountStatus(jid);
+
+    // Si trae info de ban
+    if (status?.account?.attrs?.status === "fail") {
+      return m.reply(
+        `🔴 *BANEADO PERMANENTE*\n` +
+        `📄 Motivo: *${status.account.attrs.reason || "Desconocido"}*\n` +
+        `🧩 Código: ${status.account.attrs["violation_type"] || "?"}`
+      );
+    }
+
+    // Si está activo
+    return m.reply("🟢 *Activo actualmente*");
+
+  } catch (err) {
+    console.log(err);
+    return m.reply("❌ Error al consultar el estado en WhatsApp.");
+  }
+};
 
 handler.command = /^wa$/i;
 export default handler;
