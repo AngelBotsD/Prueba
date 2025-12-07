@@ -40,7 +40,7 @@ const handler = async (msg, { conn, wa }) => {
       wa?.downloadContentFromMessage ||
       (await import("@whiskeysockets/baileys")).downloadContentFromMessage;
 
-    await conn.sendMessage(msg.key.remoteJid, { react: { text: "⏳", key: msg.key } });
+    await conn.sendMessage(msg.key.remoteJid, { react: { text: "🕒", key: msg.key } });
 
     const stream = await dcfm(sticker, "sticker");
     let buffer = Buffer.alloc(0);
