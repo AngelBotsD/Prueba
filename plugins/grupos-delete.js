@@ -1,39 +1,47 @@
-let handler = async (m, { conn }) => {
-if (!m.quoted) 
-return conn.reply(m.chat, `🧹 *𝚁𝚎𝚜𝚙𝚘𝚗𝚍𝚎 𝙰𝚕 𝚖𝚎𝚗𝚜𝚊𝚓𝚎 𝚚𝚞𝚎 𝚍𝚎𝚜𝚎𝚊𝚜 𝙴𝚕𝚒𝚖𝚒𝚗𝚊𝚛*.`, m.key);
+import fs from "fs"
+import path from "path"
 
-try {
-let delet = m.message.extendedTextMessage?.contextInfo?.participant;
-let bang = m.message.extendedTextMessage?.contextInfo?.stanzaId;
+const handler = async (msg, { conn }) => {
+  const chatId = msg.key.remoteJid
 
-if (bang && delet) {
-await conn.sendMessage(m.chat, { 
-delete: { remoteJid: m.chat, fromMe: false, id: bang, participant: delet } 
-});
-} else {
-await conn.sendMessage(m.chat, { 
-delete: { remoteJid: m.chat, fromMe: true, id: m.quoted.key.id } 
-});
-}
+  if (!msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
+    await conn.sendMessage(chatId, {
+      text: "❓ *Debes responder al mensaje que deseas eliminar con el comando `.delete`.*"
+    }, { quoted: msg })
+    return
+  }
 
-await conn.sendMessage(m.chat, {
-react: {
-text: '✅',
-key: m.key
-}
-});
+  const { stanzaId, participant } = msg.message.extendedTextMessage.contextInfo
 
-} catch (e) {
-console.error(e);
-conn.reply(m.chat, '❌ *𝙽𝚘 𝚂𝚎 𝚙𝚞𝚍𝚘 𝚎𝚕𝚒𝚖𝚒𝚗𝚊𝚛 𝚎𝚕 𝙼𝚎𝚗𝚜𝚊𝚓𝚎*.', m.key);
-}
+  try {
+    await conn.sendMessage(chatId, {
+      delete: {
+        remoteJid: chatId,
+        fromMe: false,
+        id: stanzaId,
+        participant
+      }
+    })
+
+    // ✔ Reacción al mensaje del usuario
+    await conn.sendMessage(chatId, {
+      react: {
+        text: "✅",
+        key: msg.key
+      }
+    })
+
+  } catch (e) {
+    console.error("❌ Error al eliminar mensaje:", e)
+    await conn.sendMessage(chatId, {
+      text: "❌ *No se pudo eliminar el mensaje.*"
+    }, { quoted: msg })
+  }
 }
 
 handler.help = ["𝖣𝖾𝗅𝖾𝗍𝖾"];
 handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"];
 handler.customPrefix = /^\.?(del|delete)$/i;
 handler.command = new RegExp();
-handler.group = true;
-handler.admin = true;
 
-export default handler;
+export default handler
