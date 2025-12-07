@@ -153,7 +153,7 @@ const handler = async (msg, { conn, command, wa }) => {
       {
         video: fs.readFileSync(output),
         mimetype: "video/mp4",
-        caption: "✅ *Sticker convertido a video.*\n\n🍧 _La Suki Bot_"
+        caption: "✅ *Sticker convertido a video."
       },
       { quoted: msg }
     );
