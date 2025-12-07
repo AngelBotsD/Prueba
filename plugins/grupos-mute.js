@@ -41,7 +41,7 @@ let handler = async (m, { conn, command, isAdmin }) => {
     if (!user) return m.reply('⚠️ Usa: *.mute @usuario* o responde a su mensaje.')
     if (user === sender) return m.reply('❌ No puedes mutearte a ti mismo.')
     if (user === conn.user.jid) return m.reply('🤖 No puedes mutear al bot.')
-    if (OWNER_LID.includes(user)) return m.reply('👑 No puedes mutear a un LID/Owner.')
+    if (OWNER_LID.includes(user)) return m.reply('👑 No puedes mutear a tu papi')
     if (!(isAdmin || OWNER_LID.includes(sender))) return m.reply('🚫 Solo los administradores pueden usar este comando.')
 
     const imgUrl = command === 'mute'
