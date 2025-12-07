@@ -4,10 +4,10 @@ let handler = async (m, { conn, args }) => {
   let number = args.join("").replace(/\D/g, "");
   let full = number + "@s.whatsapp.net";
 
-  m.reply("⏳ *Analizando directamente con servidores oficiales de WhatsApp...*");
+  m.reply("⏳ *Consultando servidores de WhatsApp...*");
 
   try {
-    // **Query REAL al endpoint de ban check**
+    // Consulta REAL del estado de cuenta al servidor de WhatsApp
     const res = await conn.query({
       tag: "iq",
       attrs: {
@@ -15,38 +15,23 @@ let handler = async (m, { conn, args }) => {
         type: "get",
         xmlns: "urn:xmpp:whatsapp:account"
       },
-      content: [
-        { tag: "status", attrs: {}, content: [] }
-      ]
+      content: [{ tag: "status", attrs: {}, content: [] }]
     });
 
     let node = res?.content?.[0];
+    let state = node?.attrs?.type || "active"; 
+    let reason = node?.attrs?.reason || "none";
 
-    // Si WhatsApp no responde
-    if (!node) {
-      return m.reply("❌ Error: WhatsApp no devolvió ningún dato.");
+    // Si está baneado (temporal, permanente, spam, restricción, etc.)
+    if (state !== "active" || reason !== "none") {
+      return m.reply(`🔴 *BANEADO DE WHATSAPP*`);
     }
 
-    let ban = node?.attrs?.type || "active";
-    let reason = node?.attrs?.reason || "none";
-    let violation = node?.attrs?.violation_type || "0";
-
-    // respuesta construida
-    let result = {
-      banned: ban !== "active",
-      reason,
-      details: {
-        login: number,
-        status: ban,
-        violation_type: violation
-      }
-    };
-
-    // enviar al chat formato JSON
-    return m.reply("```" + JSON.stringify(result, null, 4) + "```");
+    // Si está activo
+    return m.reply(`🟢 *ACTIVO ACTUALMENTE*`);
 
   } catch (e) {
-    console.log("ERROR EN STATUS CHECK:", e);
+    console.log("STATUS ERROR:", e);
     return m.reply("❌ Error consultando WhatsApp, puede estar rate-limited.");
   }
 };
