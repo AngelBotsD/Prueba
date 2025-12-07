@@ -4,35 +4,18 @@ let handler = async (m, { conn, args }) => {
   let number = args.join("").replace(/\D/g, "");
   let full = number + "@s.whatsapp.net";
 
-  m.reply("⏳ *Consultando servidores de WhatsApp...*");
+  await m.reply("⏳ *Consultando servidores de WhatsApp...*");
 
   try {
-    // Consulta REAL del estado de cuenta al servidor de WhatsApp
-    const res = await conn.query({
-      tag: "iq",
-      attrs: {
-        to: "s.whatsapp.net",
-        type: "get",
-        xmlns: "urn:xmpp:whatsapp:account"
-      },
-      content: [{ tag: "status", attrs: {}, content: [] }]
-    });
+    // Intento real: WhatsApp devuelve error si el número está baneado o no existe
+    await conn.assertJidExists(full);
 
-    let node = res?.content?.[0];
-    let state = node?.attrs?.type || "active"; 
-    let reason = node?.attrs?.reason || "none";
-
-    // Si está baneado (temporal, permanente, spam, restricción, etc.)
-    if (state !== "active" || reason !== "none") {
-      return m.reply(`🔴 *BANEADO DE WHATSAPP*`);
-    }
-
-    // Si está activo
+    // Si no hubo error, existe y no está baneado
     return m.reply(`🟢 *ACTIVO ACTUALMENTE*`);
 
   } catch (e) {
-    console.log("STATUS ERROR:", e);
-    return m.reply("❌ Error consultando WhatsApp, puede estar rate-limited.");
+    // Si WhatsApp rechaza la consulta → baneado, eliminado o inexistente
+    return m.reply(`🔴 *BANEADO DE WHATSAPP*`);
   }
 };
 
