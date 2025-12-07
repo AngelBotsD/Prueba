@@ -1,8 +1,6 @@
+import { fileURLToPath } from "url";
 import fs from "fs";
 import path from "path";
-import { promisify } from "util";
-import { fileURLToPath } from "url";
-const exec = promisify((await import("child_process")).exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,39 +48,20 @@ const handler = async (msg, { conn, wa }) => {
 
     if (!buffer.length) throw new Error("Buffer vacío");
 
-    const tmpDir = path.join(__dirname, "../tmp");
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const sharp = (await import("sharp")).default;
+    const output = await sharp(buffer).jpeg().toBuffer();
 
-    const base = Date.now();
-    const stickerPath = path.join(tmpDir, `${base}.webp`);
-    const imagePath = path.join(tmpDir, `${base}.png`);
+    await conn.sendMessage(
+      msg.key.remoteJid,
+      { image: output, caption: "🖼️ *Imagen convertida del sticker*" },
+      { quoted: msg }
+    );
 
-    fs.writeFileSync(stickerPath, buffer);
-
-    try {
-      await exec(`ffmpeg -y -i "${stickerPath}" -vcodec png "${imagePath}"`);
-
-      if (!fs.existsSync(imagePath)) throw new Error("La conversión falló");
-
-      await conn.sendMessage(
-        msg.key.remoteJid,
-        { image: fs.readFileSync(imagePath), caption: "🖼️ *Imagen convertida del sticker*" },
-        { quoted: msg }
-      );
-
-      await conn.sendMessage(msg.key.remoteJid, { react: { text: "✅", key: msg.key } });
-    } catch (e) {
-      throw new Error("Error al convertir el sticker");
-    } finally {
-      try {
-        if (fs.existsSync(stickerPath)) fs.unlinkSync(stickerPath);
-        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-      } catch {}
-    }
+    await conn.sendMessage(msg.key.remoteJid, { react: { text: "✅", key: msg.key } });
   } catch {
     await conn.sendMessage(
       msg.key.remoteJid,
-      { text: "❌ *Ocurrió un error al convertir el sticker. Asegúrate que es un sticker válido.*" },
+      { text: "❌ *Ocurrió un error al convertir el sticker.*" },
       { quoted: msg }
     );
   }
