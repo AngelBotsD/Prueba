@@ -33,16 +33,15 @@ async function getThumb(url) {
 }
 
 let handler = async (m, { conn, command, isAdmin }) => {
-    if (!m.isGroup) return m.reply('⚠️ Este comando solo funciona en grupos.')
-    
     const user = m.quoted?.sender || m.mentionedJid?.[0]
     const sender = m.sender
 
     if (!user) return m.reply('⚠️ Usa: *.mute @usuario* o responde a su mensaje.')
     if (user === sender) return m.reply('❌ No puedes mutearte a ti mismo.')
     if (user === conn.user.jid) return m.reply('🤖 No puedes mutear al bot.')
-    if (OWNER_LID.includes(user)) return m.reply('👑 No puedes mutear a tu papi')
-    if (!(isAdmin || OWNER_LID.includes(sender))) return m.reply('🚫 Solo los administradores pueden usar este comando.')
+    if (OWNER_LID.includes(user)) return m.reply('👑 No puedes mutear a un LID/Owner.')
+
+    if (!(isAdmin || OWNER_LID.includes(sender))) return
 
     const imgUrl = command === 'mute'
         ? 'https://telegra.ph/file/f8324d9798fa2ed2317bc.png'
@@ -61,12 +60,12 @@ let handler = async (m, { conn, command, isAdmin }) => {
     try { name = await conn.getName(user) } catch {}
 
     if (command === 'mute') {
-        if (mutedData[m.chat].includes(user)) return m.reply('⚠️ Ese usuario ya está muteado.')
+        if (mutedData[m.chat].includes(user)) return
         mutedData[m.chat].push(user)
         await saveMutedData()
-        await conn.sendMessage(m.chat, { text: `🔇 *${name}* fue muteado.\nSus mensajes serán eliminados y no podrá usar comandos.`, mentions: [user] }, { quoted: preview })
+        await conn.sendMessage(m.chat, { text: `🔇 *${name}* fue muteado.`, mentions: [user] }, { quoted: preview })
     } else {
-        if (!mutedData[m.chat].includes(user)) return m.reply('⚠️ Ese usuario no está muteado.')
+        if (!mutedData[m.chat].includes(user)) return
         mutedData[m.chat] = mutedData[m.chat].filter(u => u !== user)
         if (!mutedData[m.chat].length) delete mutedData[m.chat]
         await saveMutedData()
@@ -75,30 +74,23 @@ let handler = async (m, { conn, command, isAdmin }) => {
 }
 
 handler.before = async (m, { conn, isCommand }) => {
-    if (!m.isGroup || m.fromMe || OWNER_LID.includes(m.sender)) return
+    if (!m.isGroup) return
+    if (m.fromMe) return
+    if (OWNER_LID.includes(m.sender)) return
+
     const mutedList = mutedData[m.chat]
     if (!mutedList || !mutedList.includes(m.sender)) return
-    if (isCommand) return !1
 
-    if (!global.deleteQueue) global.deleteQueue = []
-    global.deleteQueue.push({ chat: m.chat, key: m.key, conn })
+    if (isCommand) return false
 
-    if (!global.deleteProcessing) {
-        global.deleteProcessing = true
-        setImmediate(async function processDeletes() {
-            const queue = global.deleteQueue.splice(0)
-            await Promise.all(queue.map(({ chat, key, conn }) => conn.sendMessage(chat, { delete: key }).catch(() => {})))
-            if (global.deleteQueue.length) setImmediate(processDeletes)
-            else global.deleteProcessing = false
-        })
-    }
-    return true
+    return await conn.sendMessage(m.chat, { delete: m.key }).catch(() => {})
 }
 
 handler.all = async (m) => {
-    if (!m.isGroup || m.fromMe || OWNER_LID.includes(m.sender)) return
+    if (!m.isGroup) return
+    if (m.fromMe || OWNER_LID.includes(m.sender)) return
     const mutedList = mutedData[m.chat]
-    if (mutedList && mutedList.includes(m.sender)) return !1
+    if (mutedList && mutedList.includes(m.sender)) return false
 }
 
 handler.help = ["𝖬𝗎𝗍𝖾", "𝖴𝗇𝗆𝗎𝗍𝖾"]
