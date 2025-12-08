@@ -41,18 +41,25 @@ let handler = async (m, { conn, text }) => {
       { quoted: m }
     )
 
-  // ✨ NUEVA LÓGICA
+  // Valores por defecto
   let packname = ''
   let author = ''
 
-  if (!text || !text.includes('|')) {
-    // Si NO dan argumentos → author = nombre del usuario
+  // ✨ LÓGICA COMPLETA
+  if (!text || text.trim().length === 0) {
+    // caso ".wm" → autor = nombre del usuario
     author = m.pushName || 'Usuario'
-  } else {
-    // Si usan pack|author
+
+  } else if (text.includes('|')) {
+    // caso ".wm pack|autor"
     let parts = text.split('|').map(v => v.trim())
     packname = parts[0] || ''
     author = parts[1] || (m.pushName || '')
+
+  } else {
+    // caso ".wm angel"
+    packname = ''
+    author = text.trim()
   }
 
   let media = await q.download()
@@ -68,8 +75,8 @@ let handler = async (m, { conn, text }) => {
   )
 }
 
-handler.help = ["𝖶𝗆 <𝖳𝖾𝗑𝗍𝗈>"]
-handler.tags = ["𝖲𝖳𝖨𝖢𝖪𝖤𝖱𝖲"]
-handler.command = ['wm', 'robar', 'robarsticker']
+handler.help = ["wm <texto>"]
+handler.tags = ["stickers"]
+handler.command = ['wm', 'take', 'robarsticker']
 
 export default handler
