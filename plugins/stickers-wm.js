@@ -1,15 +1,14 @@
 import crypto from 'crypto'
 import webp from 'node-webpmux'
 
-// Generar EXIF optimizado
-async function addExif(stickerBuffer, packname = '', author = '') {
+// Crear EXIF solo con packname
+async function addExif(stickerBuffer, packname = '') {
   const img = new webp.Image()
   await img.load(stickerBuffer)
 
   const json = {
     'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
     'sticker-pack-name': packname,
-    'sticker-pack-publisher': author,
     emojis: ['✨', '🌸', '💫']
   }
 
@@ -39,31 +38,26 @@ let handler = async (m, { conn, text }) => {
     const mime = q.mimetype || q.msg?.mimetype || ''
 
     if (!/webp/.test(mime))
-      return m.reply('✿ Solo puedes usar este comando respondiendo a un *sticker webp*.')
+      return m.reply('✿ Responde a un *sticker webp* para editar su watermark.')
 
-    // LIMPIEZA DEL TEXTO
+    // Limpieza del texto
     let clean = (text || '').trim()
 
-    // Si el usuario pone solo ".wm angel" → pack = angel, autor = angel
     let packname = ''
-    let author = ''
 
-    if (clean.includes('|')) {
-      // Caso normal ".wm pack | autor"
-      const parts = clean.split('|').map(v => v.trim())
-      packname = parts[0] || ''
-      author = parts[1] || ''
-    } else if (clean) {
-      // Caso ".wm angel" → ambos = angel
+    if (clean) {
+      // Si la persona envía ".wm algo" → packname = lo escrito
       packname = clean
-      author = clean
+    } else {
+      // Si la persona envía solo ".wm" → packname = nombre del usuario
+      packname = m.pushName || 'Usuario'
     }
 
     const stickerBuffer = await q.download()
     if (!stickerBuffer)
-      return m.reply('⚠️ Hubo un error al descargar el sticker.')
+      return m.reply('⚠️ No pude descargar el sticker.')
 
-    const finalSticker = await addExif(stickerBuffer, packname, author)
+    const finalSticker = await addExif(stickerBuffer, packname)
 
     await conn.sendMessage(
       m.chat,
@@ -76,7 +70,7 @@ let handler = async (m, { conn, text }) => {
   }
 }
 
-handler.help = ['wm <pack|autor>']
+handler.help = ['wm <pack>']
 handler.tags = ['sticker']
 handler.command = ['wm', 'take', 'robarsticker']
 
