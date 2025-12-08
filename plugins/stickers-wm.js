@@ -8,7 +8,7 @@ async function addExif(stickerBuffer, packname = '') {
   const json = {
     'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
     'sticker-pack-name': packname,
-    emojis: ['✨', '❀', '💫']
+    emojis: ['🔥', '🗣️', '🥺']
   }
 
   const jsonBuf = Buffer.from(JSON.stringify(json), 'utf8')
