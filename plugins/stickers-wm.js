@@ -1,7 +1,6 @@
 import crypto from 'crypto'
 import webp from 'node-webpmux'
 
-// Crear EXIF solo con packname
 async function addExif(stickerBuffer, packname = '') {
   const img = new webp.Image()
   await img.load(stickerBuffer)
@@ -9,7 +8,7 @@ async function addExif(stickerBuffer, packname = '') {
   const json = {
     'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
     'sticker-pack-name': packname,
-    emojis: ['✨', '🌸', '💫']
+    emojis: ['✨', '❀', '💫']
   }
 
   const jsonBuf = Buffer.from(JSON.stringify(json), 'utf8')
@@ -34,44 +33,62 @@ async function addExif(stickerBuffer, packname = '') {
 
 let handler = async (m, { conn, text }) => {
   try {
-    const q = m.quoted || m
-    const mime = q.mimetype || q.msg?.mimetype || ''
+    let q = m.quoted ? m.quoted : m
+    let mime = (q.msg || q).mimetype || ''
 
     if (!/webp/.test(mime))
-      return m.reply('✿ Responde a un *sticker webp* para editar su watermark.')
+      return conn.sendMessage(
+        m.chat,
+        {
+          text: `*𝖱𝖾𝗌𝗉𝗈𝗇𝖽𝖾 𝖠 𝖴𝗇 𝖲𝗍𝗂𝖼𝗄𝖾𝗋 𝖯𝖺𝗋𝖺 𝖢𝖺𝗆𝖻𝗂𝖺𝗋𝗅𝖾 𝖤𝗅 𝖶𝗆*`,
+          ...global.rcanal
+        },
+        { quoted: m }
+      )
 
-    // Limpieza del texto
     let clean = (text || '').trim()
-
     let packname = ''
 
-    if (clean) {
-      // Si la persona envía ".wm algo" → packname = lo escrito
-      packname = clean
-    } else {
-      // Si la persona envía solo ".wm" → packname = nombre del usuario
-      packname = m.pushName || 'Usuario'
-    }
+    if (clean) packname = clean
+    else packname = m.pushName || 'Usuario'
 
-    const stickerBuffer = await q.download()
-    if (!stickerBuffer)
-      return m.reply('⚠️ No pude descargar el sticker.')
+    let media = await q.download()
+    if (!media)
+      return conn.sendMessage(
+        m.chat,
+        {
+          text: `*𝖤𝗋𝗋𝗈𝗋 𝖺𝗅 𝖣𝖤𝗌𝖢𝖠𝖱𝖦𝖠𝗋 𝖤𝖫 𝖲𝗍𝗂𝖼𝗄𝖾𝗋*`,
+          ...global.rcanal
+        },
+        { quoted: m }
+      )
 
-    const finalSticker = await addExif(stickerBuffer, packname)
+    let buffer = await addExif(media, packname)
 
     await conn.sendMessage(
       m.chat,
-      { sticker: finalSticker },
+      {
+        sticker: buffer,
+        ...global.rcanal
+      },
       { quoted: m }
     )
+
   } catch (e) {
     console.error(e)
-    m.reply('⚠️ Error al procesar el sticker.')
+    conn.sendMessage(
+      m.chat,
+      {
+        text: `*𝖮𝖢𝖴𝖱𝖱𝖨𝖮 𝖴Ν 𝖤𝖱𝖱𝖮𝖱 𝖠𝖫 𝖯𝖱𝖮𝖢𝖤𝖲𝖠𝖱 𝖤𝖫 𝖲𝖳𝖨𝖢𝖪𝖤𝖱*`,
+        ...global.rcanal
+      },
+      { quoted: m }
+    )
   }
 }
 
-handler.help = ['wm <pack>']
-handler.tags = ['sticker']
+handler.help = ["𝖶𝗆 <𝖳𝖾𝗑𝗍𝗈>"]
+handler.tags = ["𝖲𝖳𝖨𝖢𝖪𝖤𝖱𝖲"]
 handler.command = ['wm', 'take', 'robarsticker']
 
 export default handler
