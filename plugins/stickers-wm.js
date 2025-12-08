@@ -35,30 +35,27 @@ let handler = async (m, { conn, text }) => {
     return conn.sendMessage(
       m.chat,
       {
-        text: `*𝖱𝖾𝗌𝗉𝗈𝗇𝖽𝖾 𝖠 𝖴𝗇 𝖲𝗍𝗂𝖼𝗄𝖾𝗋 𝖯𝖺𝗋𝖺 𝖢𝖺𝗆𝖻𝗂𝖺𝗋𝗅𝖾 𝖤𝗅 𝖠𝗎𝗍𝗈𝗋*`,
+        text: `Responde a un sticker para cambiarle wm.`,
         ...global.rcanal
       },
       { quoted: m }
     )
 
-  // Valores por defecto
+  let defaultPack = ""
   let packname = ''
   let author = ''
 
-  // ✨ LÓGICA COMPLETA
   if (!text || text.trim().length === 0) {
-    // caso ".wm" → autor = nombre del usuario
+    packname = defaultPack
     author = m.pushName || 'Usuario'
-
-  } else if (text.includes('|')) {
-    // caso ".wm pack|autor"
+  } 
+  else if (text.includes('|')) {
     let parts = text.split('|').map(v => v.trim())
-    packname = parts[0] || ''
+    packname = parts[0] || defaultPack
     author = parts[1] || (m.pushName || '')
-
-  } else {
-    // caso ".wm angel"
-    packname = ''
+  } 
+  else {
+    packname = defaultPack
     author = text.trim()
   }
 
