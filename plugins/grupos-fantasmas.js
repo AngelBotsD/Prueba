@@ -2,7 +2,7 @@ import fs from 'fs/promises'
 import path from 'path'
 
 const OWNER_LID = ['245573982662762@lid', '274135666176172@lid']
-const DB_PATH = path.resolve('./database/ghosts.json')
+const DB_PATH = path.resolve('./database')
 const AUTOSAVE_INTERVAL = 10 * 1000
 
 function normalizeRawJid(jid) {
