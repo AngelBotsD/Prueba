@@ -91,7 +91,7 @@ const handler = async (m, { conn, args, usedPrefix }) => {
                 },
             ],
             headerType: 1,
-            viewOnce: true
+            viewOnce: false
         }, { quoted: m });
 
         await m.react('✅');
