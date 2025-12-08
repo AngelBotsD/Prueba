@@ -41,9 +41,19 @@ let handler = async (m, { conn, text }) => {
       { quoted: m }
     )
 
-  let [packname, author] = text.split('|').map(v => v.trim())
-  if (!packname) packname = ''
-  if (!author) author = ''
+  // ✨ NUEVA LÓGICA
+  let packname = ''
+  let author = ''
+
+  if (!text || !text.includes('|')) {
+    // Si NO dan argumentos → author = nombre del usuario
+    author = m.pushName || 'Usuario'
+  } else {
+    // Si usan pack|author
+    let parts = text.split('|').map(v => v.trim())
+    packname = parts[0] || ''
+    author = parts[1] || (m.pushName || '')
+  }
 
   let media = await q.download()
   let buffer = await addExif(media, packname, author)
@@ -58,8 +68,8 @@ let handler = async (m, { conn, text }) => {
   )
 }
 
-
 handler.help = ["𝖶𝗆 <𝖳𝖾𝗑𝗍𝗈>"]
 handler.tags = ["𝖲𝖳𝖨𝖢𝖪𝖤𝖱𝖲"]
-handler.command = ['wm', 'take', 'robarsticker']
+handler.command = ['wm', 'robar', 'robarsticker']
+
 export default handler
