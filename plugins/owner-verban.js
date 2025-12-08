@@ -2,12 +2,8 @@ let handler = async (m, { conn, usedPrefix }) => {
 
   let messageText = "Hola 👋";
   let dev = "Opciones de prueba";
-  let thumbnail = null;
 
-  // Puedes cargar cualquier imagen que quieras aquí
-  // thumbnail = (await conn.getFile('URL_O_BUFFER_DE_IMAGEN')).data;
-
-  let video = { url: "https://youtube.com" }; // URL fake solo para probar
+  let video = { url: "https://youtube.com" }; // URL dummy solo para probar
 
   await conn.sendMessage(
     m.chat,
@@ -17,7 +13,7 @@ let handler = async (m, { conn, usedPrefix }) => {
           interactiveMessage: {
             header: {
               title: messageText,
-              hasMediaAttachment: false, // si pones thumbnail, cámbialo a true
+              hasMediaAttachment: false // SIN imagen
             },
 
             body: { text: dev },
