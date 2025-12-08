@@ -1,87 +1,53 @@
-import yts from 'yt-search';
-import fetch from 'node-fetch';
-import { prepareWAMessageMedia, generateWAMessageFromContent } from '@whiskeysockets/baileys';
+let handler = async (m, { conn, usedPrefix }) => {
 
-const handler = async (m, { conn, args, usedPrefix }) => {
-    if (!args[0]) return conn.reply(m.chat, `*${emojis} Ingresa un título de Youtube.*`, m, rcanal);
+  let messageText = "Hola 👋";
+  let dev = "Opciones de prueba";
+  let thumbnail = null;
 
-    await m.react('🕓');
-    try {
-        let searchResults = await searchVideos(args.join(" "));
+  // Puedes cargar cualquier imagen que quieras aquí
+  // thumbnail = (await conn.getFile('URL_O_BUFFER_DE_IMAGEN')).data;
 
-        if (!searchResults.length) throw new Error('No se encontraron resultados.');
+  let video = { url: "https://youtube.com" }; // URL fake solo para probar
 
-        let video = searchResults[0];
-        let thumbnail = await (await fetch(video.miniatura)).buffer();
-
-        let messageText = `\`DESCARGAS - PLAY\`\n\n`;
-        messageText += `${video.titulo}\n\n`;
-        messageText += `*⌛ Duración:* ${video.duracion || 'No disponible'}\n`;
-        messageText += `*👤 Autor:* ${video.canal || 'Desconocido'}\n`;
-        messageText += `*📆 Publicado:* ${convertTimeToSpanish(video.publicado)}\n`;
-        messageText += `*🖇️ Url:* ${video.url}\n`;
-
-        await conn.sendMessage(m.chat, {
-            image: thumbnail,
-            caption: messageText,
-            footer: dev,
-            contextInfo: {
-                mentionedJid: [m.sender],
-                forwardingScore: 999,
-                isForwarded: true
+  await conn.sendMessage(
+    m.chat,
+    {
+      viewOnceMessage: {
+        message: {
+          interactiveMessage: {
+            header: {
+              title: messageText,
+              hasMediaAttachment: false, // si pones thumbnail, cámbialo a true
             },
-            buttons: [
+
+            body: { text: dev },
+            footer: { text: "" },
+
+            nativeFlowMessage: {
+              buttons: [
                 {
-                    buttonId: `${usedPrefix}ytmp3_v2 ${video.url}`,
-                    buttonText: { displayText: 'Audio' },
-                    type: 1,
+                  name: "quick_reply",
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "Audio",
+                    id: `${usedPrefix}ytmp3_v2 ${video.url}`
+                  })
                 },
                 {
-                    buttonId: `${usedPrefix}ytmp4 ${video.url}`,
-                    buttonText: { displayText: 'Vídeo' },
-                    type: 1,
+                  name: "quick_reply",
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "Vídeo",
+                    id: `${usedPrefix}ytmp4 ${video.url}`
+                  })
                 }
-            ],
-            headerType: 1,
-            viewOnce: true
-        }, { quoted: m });
-
-        await m.react('✅');
-    } catch (e) {
-        console.error(e);
-        await m.react('✖️');
-        conn.reply(m.chat, '*`Error al buscar el video.`*', m);
-    }
+              ]
+            }
+          }
+        }
+      }
+    },
+    { quoted: m }
+  );
 };
 
-handler.help = ['play'];
-handler.tags = ['descargas'];
-handler.command = ['didi'];
+handler.command = ["hola"];
 export default handler;
-
-async function searchVideos(query) {
-    try {
-        const res = await yts(query);
-        return res.videos.slice(0, 10).map(video => ({
-            titulo: video.title,
-            url: video.url,
-            miniatura: video.thumbnail,
-            canal: video.author.name,
-            publicado: video.timestamp || 'No disponible',
-            vistas: video.views || 'No disponible',
-            duracion: video.duration.timestamp || 'No disponible'
-        }));
-    } catch (error) {
-        console.error('Error en yt-search:', error.message);
-        return [];
-    }
-}
-
-function convertTimeToSpanish(timeText) {
-    return timeText
-        .replace(/year/, 'año').replace(/years/, 'años')
-        .replace(/month/, 'mes').replace(/months/, 'meses')
-        .replace(/day/, 'día').replace(/days/, 'días')
-        .replace(/hour/, 'hora').replace(/hours/, 'horas')
-        .replace(/minute/, 'minuto').replace(/minutes/, 'minutos');
-}
