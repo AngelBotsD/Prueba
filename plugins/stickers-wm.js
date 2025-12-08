@@ -8,7 +8,7 @@ async function addExif(stickerBuffer, packname = '') {
   const json = {
     'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
     'sticker-pack-name': packname,
-    emojis: ['🗣️', '🔥', '🚩']
+    emojis: ['✨', '❀', '💫']
   }
 
   const jsonBuf = Buffer.from(JSON.stringify(json), 'utf8')
@@ -33,6 +33,8 @@ async function addExif(stickerBuffer, packname = '') {
 
 let handler = async (m, { conn, text }) => {
   try {
+    await conn.sendMessage(m.chat, { react: { text: '🕒', key: m.key } })
+
     let q = m.quoted ? m.quoted : m
     let mime = (q.msg || q).mimetype || ''
 
@@ -73,6 +75,8 @@ let handler = async (m, { conn, text }) => {
       },
       { quoted: m }
     )
+
+    await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
 
   } catch (e) {
     console.error(e)
