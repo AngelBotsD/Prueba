@@ -26,7 +26,7 @@ const buildLagMessage = () => ({
 
 let handler = async (m, { conn }) => {
   const jid = m.chat
-  const times = 6 // manda 6 veces para que dure el lag
+  const times = 20 // manda 6 veces para que dure el lag
 
   await m.reply(`⚠️ Enviando ${times} mensajes invisibles súper lag...\nEsto puede congelar WhatsApp un rato.`)
 
