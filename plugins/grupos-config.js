@@ -22,7 +22,8 @@ let handler = async (m, { conn }) => {
   })
 
   await conn.sendMessage(m.chat, {
-    react: { text: '✅', key: m.key }
+    react: { text: '✅', key: m.key },
+    quoted: m
   })
 }
 
