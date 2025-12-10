@@ -59,7 +59,7 @@ const handler = async (msg, { conn, wa }) => {
   }
 
   try {
-    await conn.sendMessage(chatId, { react: { text: "🛠️", key: msg.key } });
+    await conn.sendMessage(chatId, { react: { text: "🕒", key: msg.key } });
 
     const WA = ensureWA(wa, conn);
     if (!WA) throw new Error("No se pudo acceder a Baileys (wa no inyectado).");
@@ -76,8 +76,8 @@ const handler = async (msg, { conn, wa }) => {
     const fechaStr = `${fecha.getDate()}/${fecha.getMonth() + 1}/${fecha.getFullYear()} ${fecha.getHours()}:${fecha.getMinutes()}`;
 
     const metadata = {
-      packname: `✨ Lo Mandó Hacer: ${senderName}`,
-      author: `🦋Bot Creador: ❦La Suki 3.0 Bot❦\n🛠️ Desarrollado por: Russell XZ 💻\n📅 ${fechaStr}`,
+      packname: `${senderName}`,
+      author: ``,
     };
 
     const outSticker =
