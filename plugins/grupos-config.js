@@ -1,4 +1,22 @@
+import fs from "fs"
+import path from "path"
+import axios from "axios"
+
+let stickerPath = path.join(process.cwd(), "media", "grupo.webp")
+
+async function ensureSticker() {
+  if (!fs.existsSync(stickerPath)) {
+    let { data } = await axios.get("https://cdn.russellxz.click/1f922165.webp", {
+      responseType: "arraybuffer"
+    })
+    fs.mkdirSync(path.dirname(stickerPath), { recursive: true })
+    fs.writeFileSync(stickerPath, Buffer.from(data))
+  }
+}
+
 let handler = async (m, { conn }) => {
+  await ensureSticker()
+
   let body = m.text?.toLowerCase() || ""
   if (!/(abrir|cerrar|open|close)/.test(body)) return
 
@@ -8,8 +26,8 @@ let handler = async (m, { conn }) => {
   await conn.groupSettingUpdate(m.chat, mode)
 
   await conn.sendMessage(m.chat, {
-    sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
-    quoted: m.msg || m
+    sticker: fs.readFileSync(stickerPath),
+    quoted: m
   })
 
   await conn.sendMessage(m.chat, {
