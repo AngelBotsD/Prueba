@@ -1,16 +1,11 @@
-// plugins/sticker.js — versión ESM
 import fs from "fs";
 import path from "path";
 import Crypto from "crypto";
 import ffmpeg from "fluent-ffmpeg";
 import webp from "node-webpmux";
 
-// === Carpeta temporal ===
 const tempFolder = path.join(path.dirname(new URL(import.meta.url).pathname), "../tmp/");
 if (!fs.existsSync(tempFolder)) fs.mkdirSync(tempFolder, { recursive: true });
-
-// === Helpers ===
-const DIGITS = (s = "") => String(s).replace(/\D/g, "");
 
 function unwrapMessage(m) {
   let n = m;
@@ -40,19 +35,27 @@ function randomFileName(ext) {
   return `${Crypto.randomBytes(6).readUIntLE(0, 6).toString(36)}.${ext}`;
 }
 
-// === Comando principal ===
 const handler = async (msg, { conn, wa }) => {
   const chatId = msg.key.remoteJid;
   const pref = global.prefixes?.[0] || ".";
+
   const ctx = msg.message?.extendedTextMessage?.contextInfo;
   const quotedRaw = ctx?.quotedMessage;
   const quoted = quotedRaw ? unwrapMessage(quotedRaw) : null;
 
-  if (!quoted?.imageMessage && !quoted?.videoMessage) {
+  let target = null;
+
+  if (quoted) target = quoted;
+  else target = msg.message;
+
+  const isImage = target?.imageMessage;
+  const isVideo = target?.videoMessage;
+
+  if (!isImage && !isVideo) {
     return conn.sendMessage(
       chatId,
       {
-        text: `⚠️ *Responde a una imagen o video para crear un sticker.*\n\n✳️ Ejemplo:\n${pref}s (respondiendo a una imagen)`,
+        text: `⚠️ *Envía o responde a una imagen o video con ${pref}s para crear un sticker.*`,
       },
       { quoted: msg }
     );
@@ -64,20 +67,18 @@ const handler = async (msg, { conn, wa }) => {
     const WA = ensureWA(wa, conn);
     if (!WA) throw new Error("No se pudo acceder a Baileys (wa no inyectado).");
 
-    const mediaType = quoted.imageMessage ? "image" : "video";
-    const mediaNode = quoted[`${mediaType}Message`];
+    const mediaType = isImage ? "image" : "video";
+    const mediaNode = target[`${mediaType}Message`];
+
     const stream = await WA.downloadContentFromMessage(mediaNode, mediaType);
 
     let buffer = Buffer.alloc(0);
     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
 
-    const senderName = msg.pushName || "Usuario Desconocido";
-    const fecha = new Date();
-    const fechaStr = `${fecha.getDate()}/${fecha.getMonth() + 1}/${fecha.getFullYear()} ${fecha.getHours()}:${fecha.getMinutes()}`;
-
+    const senderName = msg.pushName || "Usuario";
     const metadata = {
-      packname: `${senderName}`,
-      author: ``,
+      packname: senderName,
+      author: ""
     };
 
     const outSticker =
@@ -97,7 +98,6 @@ const handler = async (msg, { conn, wa }) => {
 handler.command = ["s"];
 export default handler;
 
-// === Funciones auxiliares ===
 async function imageToWebp(media) {
   const tmpIn = path.join(tempFolder, randomFileName("jpg"));
   const tmpOut = path.join(tempFolder, randomFileName("webp"));
@@ -171,7 +171,7 @@ async function addExif(webpBuffer, metadata) {
     "sticker-pack-id": "suki-3.0",
     "sticker-pack-name": metadata.packname,
     "sticker-pack-publisher": metadata.author,
-    emojis: metadata.categories || [""],
+    emojis: [""],
   };
 
   const exifAttr = Buffer.from([
