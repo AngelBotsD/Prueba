@@ -366,7 +366,6 @@ conn.ev.off('messages.upsert', conn.handler)
 conn.ev.off('connection.update', conn.connectionUpdate)
 conn.ev.off('creds.update', conn.credsUpdate)
 }
-import fs from 'fs';
 const restartFile = './restart.json';
 
 if (fs.existsSync(restartFile)) {
