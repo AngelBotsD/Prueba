@@ -1,30 +1,46 @@
-const handler = async (msg, { conn }) => {
-  const chat = msg.key.remoteJid;
+let handler = async (m, { conn, isAdmin, isBotAdmin }) => {
+  const sticker = m.message?.stickerMessage;
 
-  // Ver si respondió a un sticker
-  const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-  const sticker = quoted?.stickerMessage;
+  if (!sticker) return;
 
-  if (!sticker) {
-    return conn.sendMessage(chat, {
-      text: "Responde a un *sticker* con el comando `.id`"
-    }, { quoted: msg });
-  }
+  // ID del sticker (array → buffer)
+  const cerrarID = Buffer.from([
+    3,74,169,113,129,224,130,216,68,22,163,31,155,2,
+    77,54,200,19,222,61,146,168,204,106,77,248,131,
+    213,117,146,94,54
+  ]);
 
-  // Obtener SHA256
-  const sha = sticker.fileSha256?.toString("base64");
+  // Obtener SHA del sticker recibido
+  const sha = sticker.fileSha256;
 
-  if (!sha) {
-    return conn.sendMessage(chat, {
-      text: "No pude obtener el ID del sticker."
-    }, { quoted: msg });
-  }
+  // Comparar
+  if (!sha || !sha.equals(cerrarID)) return;
 
-  // Responder con el ID
-  return conn.sendMessage(chat, {
-    text: `🆔 *ID del sticker:*\n\`\`\`${sha}\`\`\``
-  }, { quoted: msg });
+  // Validar permisos
+  if (!isAdmin)
+    return conn.sendMessage(m.chat, { text: "Solo admins pueden usar este sticker." }, { quoted: m });
+
+  if (!isBotAdmin)
+    return conn.sendMessage(m.chat, { text: "Dame admin para cerrar el grupo." }, { quoted: m });
+
+  // Cerrar grupo
+  await conn.groupSettingUpdate(m.chat, "announcement");
+
+  // Sticker de confirmación
+  await conn.sendMessage(m.chat, {
+    sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
+    quoted: m
+  });
+
+  // Reacción
+  await conn.sendMessage(m.chat, {
+    react: { text: "✅", key: m.key }
+  });
 };
 
-handler.command = ["id"];
+
+handler.command = new RegExp(); // obligatorio
+handler.customPrefix = /^$/; // no activa por texto
+handler.group = true;
+
 export default handler;
