@@ -1,23 +1,16 @@
 let handler = async (m, { conn }) => {
-  const text = m.text?.trim().toLowerCase() || ""
-  let action = text.match(/(abrir|cerrar|open|close)/)
-  if (!action) return
+  let body = m.text?.toLowerCase() || ""
+  if (!/(abrir|cerrar|open|close)/.test(body)) return
 
-  action = action[1]
-
-  let mode = /abrir|open/.test(action)
-    ? "not_announcement"
-    : "announcement"
+  let abrir = /(abrir|open)/.test(body)
+  let mode = abrir ? "not_announcement" : "announcement"
 
   await conn.groupSettingUpdate(m.chat, mode)
 
-  await conn.sendMessage(
-    m.chat,
-    {
-      sticker: { url: "https://cdn.russellxz.click/9b99dd72.webp" },
-      quoted: m
-    }
-  )
+  await conn.sendMessage(m.chat, {
+    sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
+    quoted: m.msg || m
+  })
 
   await conn.sendMessage(m.chat, {
     react: { text: "✅", key: m.key }
