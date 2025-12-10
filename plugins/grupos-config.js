@@ -1,92 +1,31 @@
-let tovarDB = {};
-
-function hashSticker(buffer) {
-  return Buffer.from(buffer).toString("base64");
-}
-
-function getStickerFromMsg(msg) {
-  return (
-    msg.message?.stickerMessage ||
-    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage ||
-    null
-  );
-}
-
 const handler = async (msg, { conn }) => {
+  const body = msg.text?.trim().toLowerCase() || "";
   const chat = msg.key.remoteJid;
-  const text = msg.text?.toLowerCase() || "";
-  const isTovarCmd = text.startsWith(".tovar");
 
-  const stickerInMsg = getStickerFromMsg(msg);
+  if (!body.startsWith(".tovar")) return;
 
-  // ===== 1) CONFIGURAR STICKER =====
-  if (isTovarCmd) {
-    if (!stickerInMsg) {
-      await conn.sendMessage(chat, {
-        text: "Responde a un *sticker* con:\n.tovar abrir\n.tovar cerrar",
-        quoted: msg
-      });
-      return;
-    }
+  const args = body.split(" ");
+  const accion = args[1]; // abrir / cerrar
 
-    let tipo = "";
-    if (text.includes("abrir")) tipo = "abrir";
-    else if (text.includes("cerrar")) tipo = "cerrar";
-    else {
-      await conn.sendMessage(chat, {
-        text: "Usa:\n.tovar abrir\n.tovar cerrar",
-        quoted: msg
-      });
-      return;
-    }
-
-    const buff = await conn.download(stickerInMsg);
-    const hash = hashSticker(buff);
-
-    if (!tovarDB[chat]) tovarDB[chat] = {};
-    tovarDB[chat][tipo] = hash;
-
-    await conn.sendMessage(chat, {
-      text: `Sticker asignado para *${tipo.toUpperCase()}*.`,
-      quoted: msg
-    });
-
-    return;
+  if (!["abrir", "cerrar"].includes(accion)) {
+    return conn.sendMessage(chat, { text: "Usa:\n.tovar abrir\n.tovar cerrar" });
   }
 
-  // ===== 2) DETECTAR STICKER USADO =====
-  if (stickerInMsg) {
-    if (!tovarDB[chat]) return;
+  const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  const isSticker = quoted?.stickerMessage ? true : false;
 
-    const buff = await conn.download(stickerInMsg);
-    const hash = hashSticker(buff);
-
-    if (tovarDB[chat].abrir === hash) {
-      await conn.groupSettingUpdate(chat, "not_announcement");
-
-      await conn.sendMessage(chat, {
-        sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
-        quoted: msg
-      });
-
-      return;
-    }
-
-    if (tovarDB[chat].cerrar === hash) {
-      await conn.groupSettingUpdate(chat, "announcement");
-
-      await conn.sendMessage(chat, {
-        sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
-        quoted: msg
-      });
-
-      return;
-    }
+  if (!isSticker) {
+    return conn.sendMessage(chat, { text: "Responde a un *sticker* con:\n.tovar abrir\n.tovar cerrar" });
   }
+
+  const stickerSha = quoted.stickerMessage.fileSha256.toString("base64");
+
+  global.stickersAcciones = global.stickersAcciones || {};
+  global.stickersAcciones[stickerSha] = accion;
+
+  return conn.sendMessage(chat, { text: `Listo. Ese sticker ahora sirve para *${accion}* el grupo.` });
 };
-
 handler.customPrefix = /^\.tovar/i;
 handler.command = new RegExp();
-handler.group = true;
 
 export default handler;
