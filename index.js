@@ -366,6 +366,21 @@ conn.ev.off('messages.upsert', conn.handler)
 conn.ev.off('connection.update', conn.connectionUpdate)
 conn.ev.off('creds.update', conn.credsUpdate)
 }
+import fs from 'fs';
+import { conn } from './conn.js'; // Tu instancia de Baileys DS6
+const restartFile = './restart.json';
+
+if (fs.existsSync(restartFile)) {
+    try {
+        const data = JSON.parse(fs.readFileSync(restartFile));
+
+        await conn.modifyMessage(data.chat, data.id, { text: '✅ De vuelta en línea' });
+
+        fs.unlinkSync(restartFile);
+    } catch (e) {
+        console.log('Error al editar mensaje de reinicio:', e);
+    }
+}
 conn.handler = handler.handler.bind(global.conn)
 conn.connectionUpdate = connectionUpdate.bind(global.conn)
 conn.credsUpdate = saveCreds.bind(global.conn, true)
