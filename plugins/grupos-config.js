@@ -5,12 +5,9 @@ let handler = async (m, { conn }) => {
 
   action = action[1]
 
-  let mode
-  if (/abrir|open/.test(action)) {
-    mode = "not_announcement"
-  } else {
-    mode = "announcement"
-  }
+  let mode = /abrir|open/.test(action)
+    ? "not_announcement"
+    : "announcement"
 
   await conn.groupSettingUpdate(m.chat, mode)
 
