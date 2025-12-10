@@ -38,7 +38,8 @@ let handler = async (m, { conn }) => {
 handler.help = ["𝖦𝗋𝗎𝗉𝗈 𝖠𝖻𝗋𝗂𝗋", "𝖦𝗋𝗎𝗉𝗈 𝖢𝖾𝗋𝗋𝖺𝗋"]
 handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"]
 handler.customPrefix = /^(?:\.?grupo\s*(abrir|cerrar|open|close)|\.?(abrir|cerrar|open|close))$/i
-handler.command = new RegExp()
-handler.group = true
-
+handler.command = new RegExp();
+handler.group = true;
+handler.admin = true;
+export default handler
 export default handler
