@@ -42,4 +42,3 @@ handler.command = new RegExp();
 handler.group = true;
 handler.admin = true;
 export default handler
-export default handler
