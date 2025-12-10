@@ -15,7 +15,7 @@ let handler = async (m, { conn }) => {
     m.chat,
     {
       sticker: { url: "https://cdn.russellxz.click/9b99dd72.webp" },
-      quoted: msg
+      quoted: m
     }
   )
 
