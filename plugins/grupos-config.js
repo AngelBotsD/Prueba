@@ -1,63 +1,102 @@
+import fs from "fs";
+import path from "path";
+
+const dbPath = path.resolve("./tovar.json");
+
+// Cargar JSON (si no existe lo crea automáticamente)
+function loadDB() {
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, "{}");  // ← aquí se crea automáticamente
+  }
+
+  const content = fs.readFileSync(dbPath, "utf8") || "{}";
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    fs.writeFileSync(dbPath, "{}");
+    return {};
+  }
+}
+
+// Guardar JSON
+function saveDB(data) {
+  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+}
+
 const handler = async (msg, { conn, isAdmin, isBotAdmin }) => {
   const chat = msg.key.remoteJid;
-  const body = msg.text?.trim().toLowerCase() || "";
 
-  // ============ 1. CONFIGURAR STICKERS (.tovar abrir/cerrar) ============
-  if (body.startsWith(".tovar")) {
-    const args = body.split(" ");
-    const accion = args[1]; // abrir / cerrar
-
-    if (!["abrir", "cerrar"].includes(accion)) {
-      return conn.sendMessage(chat, { text: "Usa:\n.tovar abrir\n.tovar cerrar" });
-    }
-
-    const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    const isSticker = quoted?.stickerMessage ? true : false;
-
-    if (!isSticker) {
-      return conn.sendMessage(chat, { text: "Responde a un *sticker* con:\n.tovar abrir\n.tovar cerrar" });
-    }
-
-    const sha = quoted.stickerMessage.fileSha256.toString("base64");
-
-    global.stickersAcciones = global.stickersAcciones || {};
-    global.stickersAcciones[sha] = accion;
-
-    return conn.sendMessage(chat, { text: `Ese sticker ahora sirve para *${accion}* el grupo.` });
-  }
-
-  // ============ 2. DETECTAR SI SE MANDÓ UN STICKER =============
+  // =============================================
+  // 1. Cuando mandan un sticker, verificar si tiene acción
+  // =============================================
   const sticker = msg.message?.stickerMessage;
-  if (!sticker) return;
+  if (sticker) {
+    const sha = sticker.fileSha256?.toString("base64");
+    const db = loadDB();
+    const accion = db[sha];
 
-  const sha = sticker.fileSha256?.toString("base64");
-  if (!sha) return;
+    if (!accion) return; // sticker NO vinculado, no hacer nada
 
-  // ============ 3. VER SI EL STICKER ESTÁ CONFIGURADO =============
-  global.stickersAcciones = global.stickersAcciones || {};
-  const accion = global.stickersAcciones[sha];
+    if (!isAdmin) {
+      return conn.sendMessage(chat, { text: "Sólo un admin puede usar este sticker." });
+    }
 
-  if (!accion) return;
+    if (!isBotAdmin) {
+      return conn.sendMessage(chat, { text: "Necesito admin para modificar el grupo." });
+    }
 
-  // Solo admins pueden activarlo
-  if (!isAdmin) {
-    return conn.sendMessage(chat, { text: "Solo un admin puede usar este sticker." });
+    if (accion === "abrir") {
+      await conn.groupSettingUpdate(chat, "not_announcement");
+      return conn.sendMessage(chat, { text: "✔ *Grupo ABIERTO* por sticker." });
+    }
+
+    if (accion === "cerrar") {
+      await conn.groupSettingUpdate(chat, "announcement");
+      return conn.sendMessage(chat, { text: "✔ *Grupo CERRADO* por sticker." });
+    }
+
+    return;
   }
 
-  if (!isBotAdmin) {
-    return conn.sendMessage(chat, { text: "No soy admin para cambiar los ajustes del grupo." });
+  // =============================================
+  // 2. Comando .tovar abrir / .tovar cerrar
+  // =============================================
+  const text = msg.text?.trim().toLowerCase() || "";
+  if (!text.startsWith(".tovar")) return;
+
+  const args = text.split(" ");
+  const accion = args[1];
+
+  if (!["abrir", "cerrar"].includes(accion)) {
+    return conn.sendMessage(chat, {
+      text: "Usa:\n.tovar abrir\n.tovar cerrar\n(respondiendo a un sticker)"
+    });
   }
 
-  // ============ 4. EJECUTAR ACCIÓN: ABRIR / CERRAR ============
-  if (accion === "abrir") {
-    await conn.groupSettingUpdate(chat, "not_announcement");
-    return conn.sendMessage(chat, { text: "✔️ Grupo *abierto* por sticker." });
+  // Debe responder a un sticker
+  const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+  const quotedSticker = quoted?.stickerMessage;
+
+  if (!quotedSticker) {
+    return conn.sendMessage(chat, {
+      text: "Responde a un *sticker* con:\n.tovar abrir\n.tovar cerrar"
+    });
   }
 
-  if (accion === "cerrar") {
-    await conn.groupSettingUpdate(chat, "announcement");
-    return conn.sendMessage(chat, { text: "✔️ Grupo *cerrado* por sticker." });
+  const sha = quotedSticker.fileSha256?.toString("base64");
+  if (!sha) {
+    return conn.sendMessage(chat, { text: "No se pudo obtener el ID del sticker." });
   }
+
+  // Guardar en JSON automáticamente
+  const db = loadDB();
+  db[sha] = accion;
+  saveDB(db);
+
+  return conn.sendMessage(chat, {
+    text: `Ese sticker ahora sirve para *${accion}* el grupo.`
+  });
 };
 
 handler.customPrefix = /^\.tovar/i;
