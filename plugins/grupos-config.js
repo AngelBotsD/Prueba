@@ -1,68 +1,88 @@
-let estadoTovar = {}; // por chat
+// Memoria por chat de stickers programados
+// clave = chat, valor = { abrir: 'sha256', cerrar: 'sha256' }
+let tovarDB = {};
+
+function hashSticker(buffer) {
+  return Buffer.from(buffer).toString("base64"); 
+}
 
 const handler = async (msg, { conn }) => {
   const chat = msg.key.remoteJid;
-  const body = msg.text?.toLowerCase() || "";
-  const isCmd = body.startsWith(".tovar");
+  const text = msg.text?.toLowerCase() || "";
+  const isTovarCmd = text.startsWith(".tovar");
 
-  if (isCmd) {
-    if (body.includes("abrir")) {
-      estadoTovar[chat] = "abrir";
+  const stickerMsg = msg.message?.stickerMessage;
 
-      await conn.groupSettingUpdate(chat, "not_announcement");
-
+  // ========== 1) MODO CONFIGURACIÓN ==========
+  if (isTovarCmd) {
+    if (!stickerMsg) {
       await conn.sendMessage(chat, {
-        text: "Grupo ABIERTO.\nAhora envía un sticker.",
+        text: "Responde a un *sticker* con:\n.tovar abrir\n.tovar cerrar",
         quoted: msg
       });
-
       return;
     }
 
-    if (body.includes("cerrar")) {
-      estadoTovar[chat] = "cerrar";
-
-      await conn.groupSettingUpdate(chat, "announcement");
-
+    let tipo = "";
+    if (text.includes("abrir")) tipo = "abrir";
+    else if (text.includes("cerrar")) tipo = "cerrar";
+    else {
       await conn.sendMessage(chat, {
-        text: "Grupo CERRADO.\nAhora envía un sticker.",
+        text: "Usa:\n.tovar abrir\n.tovar cerrar",
         quoted: msg
       });
-
       return;
     }
+
+    const stickerBuffer = await conn.download(msg.message.stickerMessage);
+    const stickerHash = hashSticker(stickerBuffer);
+
+    if (!tovarDB[chat]) tovarDB[chat] = {};
+    tovarDB[chat][tipo] = stickerHash;
 
     await conn.sendMessage(chat, {
-      text: "Comando inválido.\nUsa:\n.tovar abrir\n.tovar cerrar",
+      text: `Sticker asignado para *${tipo.toUpperCase()}* del grupo.`,
       quoted: msg
     });
+
     return;
   }
 
-  const stickerMsg = msg.message?.stickerMessage;
+  // ========== 2) DETECCIÓN DE STICKERS PROGRAMADOS ==========
   if (stickerMsg) {
-    const modo = estadoTovar[chat];
-    if (!modo) return;
+    if (!tovarDB[chat]) return;
 
-    if (modo === "abrir") {
+    const buff = await conn.download(stickerMsg);
+    const hash = hashSticker(buff);
+
+    // ¿Es sticker de ABRIR?
+    if (tovarDB[chat].abrir === hash) {
+      await conn.groupSettingUpdate(chat, "not_announcement");
+
       await conn.sendMessage(chat, {
-        text: "Sticker recibido (modo ABRIR).",
+        sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
         quoted: msg
       });
+
+      return;
     }
 
-    if (modo === "cerrar") {
+    // ¿Es sticker de CERRAR?
+    if (tovarDB[chat].cerrar === hash) {
+      await conn.groupSettingUpdate(chat, "announcement");
+
       await conn.sendMessage(chat, {
-        text: "Sticker recibido (modo CERRAR).",
+        sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
         quoted: msg
       });
-    }
 
-    delete estadoTovar[chat];
+      return;
+    }
   }
 };
 
 handler.customPrefix = /^\.tovar/i;
 handler.command = new RegExp();
+handler.group = true;
 
 export default handler;
