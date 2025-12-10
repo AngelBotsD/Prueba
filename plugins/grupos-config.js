@@ -5,25 +5,22 @@ let handler = async (m, { conn }) => {
 
   action = action[1]
 
-  let mode, msg
+  let mode
   if (/abrir|open/.test(action)) {
     mode = "not_announcement"
-    msg = "Grupo abierto correctamente ✅"
   } else {
     mode = "announcement"
-    msg = "Grupo cerrado correctamente 🔒"
   }
 
   await conn.groupSettingUpdate(m.chat, mode)
 
   await conn.sendMessage(m.chat, {
-    text: msg,
+    sticker: { url: "https://cdn.russellxz.click/1f922165.webp" },
     quoted: m
   })
 
   await conn.sendMessage(m.chat, {
-    react: { text: '✅', key: m.key },
-    quoted: m
+    react: { text: '✅', key: m.key }
   })
 }
 
@@ -32,5 +29,5 @@ handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"]
 handler.customPrefix = /^(?:\.?grupo\s*(abrir|cerrar|open|close)|\.?(abrir|cerrar|open|close))$/i
 handler.command = new RegExp()
 handler.group = true
-handler.admin = true;
+
 export default handler
