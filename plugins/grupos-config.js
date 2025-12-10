@@ -1,9 +1,15 @@
-// Memoria por chat de stickers programados
-// clave = chat, valor = { abrir: 'sha256', cerrar: 'sha256' }
 let tovarDB = {};
 
 function hashSticker(buffer) {
-  return Buffer.from(buffer).toString("base64"); 
+  return Buffer.from(buffer).toString("base64");
+}
+
+function getStickerFromMsg(msg) {
+  return (
+    msg.message?.stickerMessage ||
+    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage ||
+    null
+  );
 }
 
 const handler = async (msg, { conn }) => {
@@ -11,11 +17,11 @@ const handler = async (msg, { conn }) => {
   const text = msg.text?.toLowerCase() || "";
   const isTovarCmd = text.startsWith(".tovar");
 
-  const stickerMsg = msg.message?.stickerMessage;
+  const stickerInMsg = getStickerFromMsg(msg);
 
-  // ========== 1) MODO CONFIGURACIÓN ==========
+  // ===== 1) CONFIGURAR STICKER =====
   if (isTovarCmd) {
-    if (!stickerMsg) {
+    if (!stickerInMsg) {
       await conn.sendMessage(chat, {
         text: "Responde a un *sticker* con:\n.tovar abrir\n.tovar cerrar",
         quoted: msg
@@ -34,28 +40,27 @@ const handler = async (msg, { conn }) => {
       return;
     }
 
-    const stickerBuffer = await conn.download(msg.message.stickerMessage);
-    const stickerHash = hashSticker(stickerBuffer);
+    const buff = await conn.download(stickerInMsg);
+    const hash = hashSticker(buff);
 
     if (!tovarDB[chat]) tovarDB[chat] = {};
-    tovarDB[chat][tipo] = stickerHash;
+    tovarDB[chat][tipo] = hash;
 
     await conn.sendMessage(chat, {
-      text: `Sticker asignado para *${tipo.toUpperCase()}* del grupo.`,
+      text: `Sticker asignado para *${tipo.toUpperCase()}*.`,
       quoted: msg
     });
 
     return;
   }
 
-  // ========== 2) DETECCIÓN DE STICKERS PROGRAMADOS ==========
-  if (stickerMsg) {
+  // ===== 2) DETECTAR STICKER USADO =====
+  if (stickerInMsg) {
     if (!tovarDB[chat]) return;
 
-    const buff = await conn.download(stickerMsg);
+    const buff = await conn.download(stickerInMsg);
     const hash = hashSticker(buff);
 
-    // ¿Es sticker de ABRIR?
     if (tovarDB[chat].abrir === hash) {
       await conn.groupSettingUpdate(chat, "not_announcement");
 
@@ -67,7 +72,6 @@ const handler = async (msg, { conn }) => {
       return;
     }
 
-    // ¿Es sticker de CERRAR?
     if (tovarDB[chat].cerrar === hash) {
       await conn.groupSettingUpdate(chat, "announcement");
 
