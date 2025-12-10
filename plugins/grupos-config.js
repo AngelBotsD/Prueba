@@ -20,8 +20,8 @@ const handler = async (msg, { conn }) => {
 
     return conn.sendMessage(chatId, {
       text: abrir
-        ? "🔓 El grupo ha sido abierto.\n📢 Todos pueden enviar mensajes."
-        : "🔒 El grupo ha sido cerrado.\n📢 Solo los administradores pueden enviar mensajes."
+        ? "𝖤𝗅 𝖦𝗋𝗎𝗉𝗈 𝖧𝖺 𝖲𝗂𝖽𝗈 𝖠𝖻𝗂𝖾𝗋𝗍𝗈 𝖢𝗈𝗋𝗋𝖾𝖼𝗍𝖺𝗆𝖾𝗇𝗍𝖾 🔓."
+        : "𝖤𝗅 𝖦𝗋𝗎𝗉𝗈 𝖧𝖺 𝖲𝗂𝖽𝗈 𝖢𝖾𝗋𝗋𝖺𝖽𝗈 𝖢𝗈𝗋𝗋𝖾𝖼𝗍𝖺𝗆𝖾𝗇𝗍𝖾🔒."
     }, { quoted: msg });
 
   } catch {
