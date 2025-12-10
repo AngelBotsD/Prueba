@@ -367,14 +367,13 @@ conn.ev.off('connection.update', conn.connectionUpdate)
 conn.ev.off('creds.update', conn.credsUpdate)
 }
 import fs from 'fs';
-import { conn } from './conn.js'; // Tu instancia de Baileys DS6
 const restartFile = './restart.json';
 
 if (fs.existsSync(restartFile)) {
     try {
         const data = JSON.parse(fs.readFileSync(restartFile));
 
-        await conn.modifyMessage(data.chat, data.id, { text: '✅ De vuelta en línea' });
+        await global.conn.modifyMessage(data.chat, data.id, { text: '✅ De vuelta en línea' });
 
         fs.unlinkSync(restartFile);
     } catch (e) {
