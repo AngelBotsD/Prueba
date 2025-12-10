@@ -1,37 +1,46 @@
 let handler = async (m, { conn }) => {
-  const text = m.text?.trim().toLowerCase() || ""
-  let action = text.match(/(abrir|cerrar|open|close)/)
-  if (!action) return
+  // === MAPEADO DIRECTO SIN JSON ===
+  const ACCIONES = {
+    // Tu sticker:
+    "3,74,169,113,129,224,130,216,68,22,163,31,155,2,77,54,200,19,222,61,146,168,204,106,77,248,131,213,117,146,94,54": "cerrargrupo",
 
-  action = action[1]
+    // Aquí puedes agregar más:
+    // "SHA256": "abrirgrupo"
+  }
 
-  let mode = /abrir|open/.test(action)
-    ? "not_announcement"
-    : "announcement"
+  // Detectar si el mensaje es un sticker
+  const stickerMsg =
+    m.message?.stickerMessage ||
+    m.message?.extendedTextMessage?.contextInfo?.quotedMessage?.stickerMessage
 
-  await conn.groupSettingUpdate(m.chat, mode)
+  if (!stickerMsg) return
 
-  // === Sticker desde bytes ===
-  const stickerBytes = [
-    3,74,169,113,129,224,130,216,68,22,163,31,155,2,77,54,
-    200,19,222,61,146,168,204,106,77,248,131,213,117,146,94,54
-  ]
+  // Obtener fileSha256 EXACTAMENTE como DS6 lo entrega
+  const rawSha = stickerMsg.fileSha256
+  if (!rawSha) return
 
-  const bufferSticker = Buffer.from(stickerBytes)
+  const shaKey = Array.from(rawSha).join(",")
 
+  // Validar si este sticker está registrado en ACCIONES
+  const accion = ACCIONES[shaKey]
+  if (!accion) return // Sticker no vinculado → no hace nada
+
+  // === EJECUTAR ACCIÓN ===
+  if (accion === "abrirgrupo") {
+    await conn.groupSettingUpdate(m.chat, "not_announcement")
+  }
+
+  if (accion === "cerrargrupo") {
+    await conn.groupSettingUpdate(m.chat, "announcement")
+  }
+
+  // Confirmación
   await conn.sendMessage(m.chat, {
-    sticker: bufferSticker,
-    quoted: m
-  })
-
-  await conn.sendMessage(m.chat, {
-    react: { text: '✅', key: m.key }
+    react: { text: "✅", key: m.key }
   })
 }
 
-handler.help = ["𝖦𝗋𝗎𝗉𝗈 𝖠𝖻𝗋𝗂𝗋", "𝖦𝗋𝗎𝗉𝗈 𝖢𝖾𝗋𝗋𝖺𝗋"]
-handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"]
-handler.customPrefix = /^(?:\.?grupo\s*(abrir|cerrar|open|close)|\.?(abrir|cerrar|open|close))$/i
+handler.customPrefix = /.*/  // Para que procese todos los mensajes
 handler.command = new RegExp()
 handler.group = true
 
