@@ -43,10 +43,7 @@ const handler = async (msg, { conn, wa }) => {
   const quotedRaw = ctx?.quotedMessage;
   const quoted = quotedRaw ? unwrapMessage(quotedRaw) : null;
 
-  let target = null;
-
-  if (quoted) target = quoted;
-  else target = msg.message;
+  let target = quoted || msg.message;
 
   const isImage = target?.imageMessage;
   const isVideo = target?.videoMessage;
@@ -54,9 +51,7 @@ const handler = async (msg, { conn, wa }) => {
   if (!isImage && !isVideo) {
     return conn.sendMessage(
       chatId,
-      {
-        text: `⚠️ *Envía o responde a una imagen o video con ${pref}s para crear un sticker.*`,
-      },
+      { text: `⚠️ Envía o responde a una imagen o video con ${pref}s para crear un sticker.`, ...global.rcanal },
       { quoted: msg }
     );
   }
@@ -65,7 +60,7 @@ const handler = async (msg, { conn, wa }) => {
     await conn.sendMessage(chatId, { react: { text: "🕒", key: msg.key } });
 
     const WA = ensureWA(wa, conn);
-    if (!WA) throw new Error("No se pudo acceder a Baileys (wa no inyectado).");
+    if (!WA) throw new Error("No se pudo acceder a Baileys.");
 
     const mediaType = isImage ? "image" : "video";
     const mediaNode = target[`${mediaType}Message`];
@@ -86,16 +81,29 @@ const handler = async (msg, { conn, wa }) => {
         ? await writeExifImg(buffer, metadata)
         : await writeExifVid(buffer, metadata);
 
-    await conn.sendMessage(chatId, { sticker: { url: outSticker } }, { quoted: msg });
+    await conn.sendMessage(
+      chatId,
+      { sticker: { url: outSticker }, ...global.rcanal },
+      { quoted: msg }
+    );
+
     await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
+
   } catch (err) {
-    console.error("[sticker] Error:", err);
-    await conn.sendMessage(chatId, { text: "❌ *Hubo un error al crear el sticker.*" }, { quoted: msg });
+    await conn.sendMessage(
+      chatId,
+      { text: "❌ Hubo un error al crear el sticker.", ...global.rcanal },
+      { quoted: msg }
+    );
+
     await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
   }
 };
 
-handler.command = ["s"];
+handler.help = ["𝖲"]
+handler.tags = ["𝖲𝖳𝖨𝖢𝖪𝖤𝖱𝖲"]
+handler.customPrefix = /^(\.s|s)$/i
+handler.command = new RegExp
 export default handler;
 
 async function imageToWebp(media) {
@@ -171,7 +179,7 @@ async function addExif(webpBuffer, metadata) {
     "sticker-pack-id": "suki-3.0",
     "sticker-pack-name": metadata.packname,
     "sticker-pack-publisher": metadata.author,
-    emojis: [""],
+    emojis: [""]
   };
 
   const exifAttr = Buffer.from([
