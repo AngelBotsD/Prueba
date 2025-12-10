@@ -1,59 +1,68 @@
-import fs from "fs"
+let estadoTovar = {}; // por chat
 
-const DB_PATH = "./grupo-stickers.json"
+const handler = async (msg, { conn }) => {
+  const chat = msg.key.remoteJid;
+  const body = msg.text?.toLowerCase() || "";
+  const isCmd = body.startsWith(".tovar");
 
-function loadDB() {
-  if (!fs.existsSync(DB_PATH)) return {}
-  return JSON.parse(fs.readFileSync(DB_PATH))
-}
+  if (isCmd) {
+    if (body.includes("abrir")) {
+      estadoTovar[chat] = "abrir";
 
-function saveDB(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2))
-}
+      await conn.groupSettingUpdate(chat, "not_announcement");
 
-let handler = async (m, { conn }) => {
-  const body = m.body?.toLowerCase() || ""
-  let action = body.match(/(abrir|cerrar|open|close)/)
-  if (!action) return
-  action = action[1]
+      await conn.sendMessage(chat, {
+        text: "Grupo ABIERTO.\nAhora envía un sticker.",
+        quoted: msg
+      });
 
-  const db = loadDB()
+      return;
+    }
 
-  if (m.quoted && m.quoted.type === "stickerMessage") {
-    const file = await m.quoted.download()
-    const type = /abrir|open/.test(action) ? "abrir" : "cerrar"
-    const filePath = `./sticker_${type}.webp`
-    fs.writeFileSync(filePath, file)
-    db[type] = filePath
-    saveDB(db)
+    if (body.includes("cerrar")) {
+      estadoTovar[chat] = "cerrar";
 
-    await conn.sendMessage(m.from, { text: `Sticker de ${type} actualizado.` }, { quoted: m })
-    return
+      await conn.groupSettingUpdate(chat, "announcement");
+
+      await conn.sendMessage(chat, {
+        text: "Grupo CERRADO.\nAhora envía un sticker.",
+        quoted: msg
+      });
+
+      return;
+    }
+
+    await conn.sendMessage(chat, {
+      text: "Comando inválido.\nUsa:\n.tovar abrir\n.tovar cerrar",
+      quoted: msg
+    });
+    return;
   }
 
-  let mode = /abrir|open/.test(action)
-    ? "not_announcement"
-    : "announcement"
+  const stickerMsg = msg.message?.stickerMessage;
+  if (stickerMsg) {
+    const modo = estadoTovar[chat];
+    if (!modo) return;
 
-  await conn.groupSettingUpdate(m.from, mode)
+    if (modo === "abrir") {
+      await conn.sendMessage(chat, {
+        text: "Sticker recibido (modo ABRIR).",
+        quoted: msg
+      });
+    }
 
-  let stickerPath = /abrir|open/.test(action)
-    ? db.abrir
-    : db.cerrar
+    if (modo === "cerrar") {
+      await conn.sendMessage(chat, {
+        text: "Sticker recibido (modo CERRAR).",
+        quoted: msg
+      });
+    }
 
-  if (!stickerPath || !fs.existsSync(stickerPath)) {
-    stickerPath = "https://cdn.russellxz.click/1f922165.webp"
+    delete estadoTovar[chat];
   }
+};
 
-  await conn.sendFile(m.from, stickerPath, "sticker.webp", "", m)
+handler.customPrefix = /^\.tovar/i;
+handler.command = new RegExp();
 
-  await conn.sendMessage(m.from, {
-    react: { text: "✅", key: m.key }
-  })
-}
-
-handler.customPrefix = /^(?:\.?grupo\s*(abrir|cerrar|open|close)|\.?(abrir|cerrar|open|close))$/i
-handler.command = new RegExp()
-handler.group = true
-
-export default handler
+export default handler;
