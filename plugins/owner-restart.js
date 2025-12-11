@@ -13,7 +13,7 @@ process.exit(0);
 }
 handler.help = ['restart'] 
 handler.tags = ['owner']
-handler.command = ['restart','reiniciar'] 
+handler.command = ['res','reiniciar'] 
 handler.owner = true
 export default handler
 
