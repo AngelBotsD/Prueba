@@ -1,31 +1,23 @@
-import fs from "fs";
-import path from "path";
-
 let handler = async (m, { conn }) => {
     try {
-        // Guardamos el mensaje a editar
-        const tempFile = path.join("./", "last-restart.json");
-        fs.writeFileSync(tempFile, JSON.stringify({
+        let msg = await conn.reply(m.chat, "🔄 Reiniciando el bot…", m);
+
+        // Guardar la info para editar después
+        let data = {
             chat: m.chat,
-            msgId: m.key.id
-        }));
+            msgId: msg.key.id
+        };
 
-        await conn.reply(m.chat, '「❀」 Reiniciando el bot...', m);
+        fs.writeFileSync("./last-restart.json", JSON.stringify(data));
 
-        // Reiniciar en 3 segundos
-        setTimeout(() => {
-            process.exit(0);
-        }, 3000);
+        setTimeout(() => process.exit(0), 1500);
 
-    } catch (e) {
-        console.log(e);
-        conn.reply(m.chat, `${e}`, m);
+    } catch (error) {
+        console.log(error);
+        conn.reply(m.chat, `${error}`, m);
     }
 };
 
-handler.help = ["restart"];
-handler.tags = ["owner"];
-handler.command = ["rei", "restart"];
+handler.command = ['rei', 'restart'];
 handler.rowner = true;
-
 export default handler;
