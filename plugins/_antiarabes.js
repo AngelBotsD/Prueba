@@ -128,6 +128,6 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
 
 handler.help = ["hd"]
 handler.tags = ["tools"]
-handler.command = ["hd"]
+handler.command = ["de"]
 
 export default handler
