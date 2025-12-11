@@ -19,10 +19,20 @@ async function getTikTok(url) {
       headers: { Authorization: `Bearer ${API_KEY}` },
       signal: controller.signal
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(`HTTP ${res.status} - ${data?.error || "Error desconocido"}`);
-    if (data.status !== "true" || !data.data?.video) throw new Error(data?.error || "La API no devolvió un video válido.");
-    return data.data;
+
+    const contentType = res.headers.get("content-type") || "";
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      if (data.status !== "true" || !data.data?.video) throw new Error(data?.error || "La API no devolvió un video válido.");
+      return data.data;
+    } else {
+      const text = await res.text();
+      throw new Error("La API no devolvió JSON válido:\n" + text.slice(0, 200));
+    }
+
   } finally {
     clearTimeout(timeout);
   }
@@ -40,6 +50,7 @@ const handler = async (msg, { conn, args, command }) => {
 
   try {
     await conn.sendMessage(chatId, { react: { text: "⏱️", key: msg.key } });
+
     const { title = "TikTok", author: authObj, duration, likes = 0, comments = 0, video } = await getTikTok(url);
     const author = authObj?.name || authObj?.username || "—";
     const durTxt = duration ? fmtSec(duration) : "—";
@@ -54,12 +65,12 @@ const handler = async (msg, { conn, args, command }) => {
 ────────────
 🤖 𝙎𝙪𝙠𝙞 𝘽𝙤𝙩`;
 
-    await conn.sendMessage(chatId, { video: { url: video }, mimetype: "video/mp4", caption, quoted: msg });
+    await conn.sendMessage(chatId, { video: { url }, mimetype: "video/mp4", caption, quoted: msg });
     await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
 
   } catch (err) {
-    console.error("❌ Error en tt:", err?.message || err);
-    await conn.sendMessage(chatId, { text: `❌ *Error:* ${err?.message || "Fallo al procesar el TikTok."}`, quoted: msg });
+    console.error("❌ Error en tt:", err);
+    await conn.sendMessage(chatId, { text: `❌ *Error:* ${err.message || "Fallo al procesar el TikTok."}`, quoted: msg });
     await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
   }
 };
@@ -67,4 +78,5 @@ const handler = async (msg, { conn, args, command }) => {
 handler.command = ["tiktok", "tt"];
 handler.help = ["tiktok <url>", "tt <url>"];
 handler.tags = ["descargas"];
+
 export default handler;
