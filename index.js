@@ -494,7 +494,7 @@ global.reload = async (_ev, file) => {
   );
 };
 Object.freeze(global.reload)
-watch(pluginFolder, global.reload)
+watch(pluginRoot, global.reload)
 await global.reloadHandler()
 async function _quickTest() {
 const test = await Promise.all([
