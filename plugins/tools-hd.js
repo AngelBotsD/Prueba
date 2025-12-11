@@ -29,14 +29,32 @@ function ensureWA(wa, conn) {
 
 const handler = async (msg, { conn, command, wa, usedPrefix }) => {
   const chatId = msg.key.remoteJid
+
   const pref = usedPrefix || global.prefixes?.[0] || "."
+  const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || ""
+  const caption = msg.message?.imageMessage?.caption || ""
+  const body = (text || caption || "").toLowerCase()
+
+  if (!body.startsWith(pref + command)) return
+
+  let quoted = null
   const ctx = msg.message?.extendedTextMessage?.contextInfo
   const quotedRaw = ctx?.quotedMessage
-  const quoted = quotedRaw ? unwrapMessage(quotedRaw) : null
-  const mime = quoted?.imageMessage?.mimetype || ""
+
+  if (quotedRaw) {
+    quoted = unwrapMessage(quotedRaw)
+  } else if (msg.message?.imageMessage) {
+    quoted = msg.message
+  }
+
+  const mime =
+    quoted?.imageMessage?.mimetype ||
+    quoted?.mimetype ||
+    msg.message?.imageMessage?.mimetype ||
+    ""
 
   if (!mime || !/image\/(jpe?g|png)/i.test(mime)) {
-    await conn.sendMessage(chatId, { react: { text: "🔥", key: msg.key } })
+    await conn.sendMessage(chatId, { react: { text: "👀", key: msg.key } })
     return conn.sendMessage(
       chatId,
       {
@@ -48,7 +66,8 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
   }
 
   try {
-    await conn.sendMessage(chatId, { react: { text: "⚡", key: msg.key } })
+    await conn.sendMessage(chatId, { react: { text: "🕒", key: msg.key } })
+
     await conn.sendMessage(
       chatId,
       {
@@ -62,7 +81,7 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
       await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } })
       return conn.sendMessage(
         chatId,
-        { text: "Error interno: no se encontró el módulo de descarga.", ...global.rcanal },
+        { text: "Error interno: no se encontró el módulo de descarga." },
         { quoted: msg }
       )
     }
@@ -104,19 +123,18 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
       chatId,
       {
         image: resultBuffer,
-        caption: "✨ Imagen mejorada con éxito por La Suki Bot"
+        caption: ""
       },
       { quoted: msg }
     )
 
-    await conn.sendMessage(chatId, { react: { text: "👑", key: msg.key } })
+    await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } })
   } catch (err) {
     await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } })
     await conn.sendMessage(
       chatId,
       {
-        text: `Falló la mejora de imagen:\n${err.message}`,
-        ...global.rcanal
+        text: `Falló la mejora de imagen:\n${err.message}`
       },
       { quoted: msg }
     )
