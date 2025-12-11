@@ -141,8 +141,7 @@ Elige cómo enviarlo:
   }
 };
 
+handler.help = ["𝖳𝗂𝗄𝗍𝗈𝗄 <𝗎𝗋𝗅>"]
+handler.tags = ["𝖣𝖤𝖲𝖢𝖠𝖱𝖦𝖠𝖲"]
 handler.command = ["tiktok", "tt"];
-handler.help = ["tiktok <url>", "tt <url>"];
-handler.tags = ["descargas"];
-
 export default handler;
