@@ -1,20 +1,25 @@
 const handler = async (m, { conn, isROwner, text }) => {
-const datas = global
+    try {
+        const { key } = await conn.sendMessage(m.chat, { text: `🚀🚀` }, { quoted: m })
+        await delay(1000)
+        await conn.sendMessage(m.chat, { text: `🚀🚀🚀🚀`, edit: key })
+        await delay(1000)
+        await conn.sendMessage(m.chat, { text: `🚀🚀🚀🚀🚀🚀`, edit: key })
+        await conn.sendMessage(m.chat, { text: `𝙍𝙚𝙞𝙣𝙞𝙘𝙞𝙖𝙧 | 𝙍𝙚𝙨𝙩𝙖𝙧𝙩`, edit: key })
 
-if (!process.send) throw 'Dont: node main.js\nDo: node index.js'
-const { key } = await conn.sendMessage(m.chat, {text: `🚀🚀`}, {quoted: m})
-await delay(1000 * 1)
-await conn.sendMessage(m.chat, {text: `🚀🚀🚀🚀`, edit: key})
-await delay(1000 * 1)
-await conn.sendMessage(m.chat, {text: `🚀🚀🚀🚀🚀🚀`, edit: key})
-await conn.sendMessage(m.chat, {text: `𝙍𝙚𝙞𝙣𝙞𝙘𝙞𝙖𝙧 | 𝙍𝙚𝙨𝙩𝙖𝙧𝙩`, edit: key})
-//process.send('reset')
-process.exit(0); 
+        process.exit(0)
+
+    } catch (error) {
+        console.log(error)
+        conn.reply(m.chat, `${error}`, m)  // ← EL MISMO ERROR DEL PRIMERO
+    }
 }
-handler.help = ['restart'] 
+
+handler.help = ['restart']
 handler.tags = ['owner']
-handler.command = ['res','reiniciar'] 
+handler.command = ['res', 'reiniciar']
 handler.owner = true
+
 export default handler
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
