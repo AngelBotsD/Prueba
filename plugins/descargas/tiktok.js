@@ -112,8 +112,7 @@ Elige cómo enviarlo:
 ✦ 𝗔𝘂𝘁𝗼𝗿: ${author}
 ✦ 𝗗𝘂𝗿.: ${durTxt} • 👍 ${likes} · 💬 ${comments}
 ✦ 𝗦𝗼𝘂𝗿𝗰𝗲: api-sky.ultraplus.click
-────────────
-🤖 𝙎𝙪𝙠𝙞 𝘽𝙤𝙩`;
+────────────`;
 
     const preview = await conn.sendMessage(chatId, { text: txt }, { quoted: msg });
 
@@ -129,8 +128,7 @@ Elige cómo enviarlo:
 ✦ 𝗟𝗶𝗸𝗲𝘀: ${likes}  •  𝗖𝗼𝗺𝗲𝗻𝘁𝗮𝗿𝗶𝗼𝘀: ${comments}
 
 ✦ 𝗦𝗼𝘂𝗿𝗰𝗲: api-sky.ultraplus.click
-────────────
-🤖 𝙎𝙪𝙠𝙞 𝘽𝙤𝙩`,
+────────────`,
       quotedBase: msg
     };
 
@@ -146,6 +144,5 @@ Elige cómo enviarlo:
 handler.command = ["tiktok", "tt"];
 handler.help = ["tiktok <url>", "tt <url>"];
 handler.tags = ["descargas"];
-handler.register = true;
 
 export default handler;
