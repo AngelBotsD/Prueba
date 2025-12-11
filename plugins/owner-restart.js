@@ -1,9 +1,12 @@
 let handler = async (m, { conn }) => {
     try {
+        // Asegurar que fs exista (sin imports)
+        const fs = global.fs || require("fs");
+
         let msg = await conn.reply(m.chat, "🔄 Reiniciando el bot…", m);
 
-        // Guardar la info para editar después
-        let data = {
+        // Guardar info del mensaje para editar después
+        const data = {
             chat: m.chat,
             msgId: msg.key.id
         };
@@ -14,10 +17,11 @@ let handler = async (m, { conn }) => {
 
     } catch (error) {
         console.log(error);
-        conn.reply(m.chat, `${error}`, m);
+        conn.reply(m.chat, String(error), m);
     }
 };
 
 handler.command = ['rei', 'restart'];
 handler.rowner = true;
+
 export default handler;
