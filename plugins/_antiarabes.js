@@ -48,13 +48,13 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
   }
 
   try {
-    await conn.sendMessage(chatId, { react: { text: "⚡", key: msg.key } })
+    await conn.sendMessage(chatId, { react: { text: "🕒", key: msg.key } })
 
+    // ❌ AQUÍ YA NO LLEVA global.rcanal
     await conn.sendMessage(
       chatId,
       {
-        text: "Mejorando la calidad de la imagen, espera un momento...",
-        ...global.rcanal
+        text: "Mejorando la calidad de la imagen... espera un momento 🧪"
       },
       { quoted: msg }
     )
@@ -102,17 +102,17 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
 
     const resultBuffer = await (await fetch(json.result_url)).buffer()
 
+    // ❌ AQUÍ TAMPOCO LLEVA global.rcanal
     await conn.sendMessage(
       chatId,
       {
         image: resultBuffer,
-        caption: "",
-        ...global.rcanal
+        caption: ""
       },
       { quoted: msg }
     )
 
-    await conn.sendMessage(chatId, { react: { text: "👑", key: msg.key } })
+    await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } })
   } catch (err) {
     await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } })
     await conn.sendMessage(
@@ -128,6 +128,6 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
 
 handler.help = ["hd"]
 handler.tags = ["tools"]
-handler.command = ["de"]
+handler.command = ["hd"]
 
 export default handler
