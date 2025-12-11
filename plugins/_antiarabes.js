@@ -1,19 +1,10 @@
-// plugins/hd.js — versión ESM
-import fs from "fs";
-import path from "path";
-import axios from "axios";
-import FormData from "form-data";
-import { fileURLToPath } from "url";
+import fs from "fs"
+import path from "path"
+import fetch from "node-fetch"
+import FormData from "form-data"
 
-// Fix para __dirname en ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// ===========================
-//    Desencapsular mensajes
-// ===========================
 function unwrapMessage(m) {
-  let n = m;
+  let n = m
   while (
     n?.viewOnceMessage?.message ||
     n?.viewOnceMessageV2?.message ||
@@ -24,161 +15,119 @@ function unwrapMessage(m) {
       n.viewOnceMessage?.message ||
       n.viewOnceMessageV2?.message ||
       n.viewOnceMessageV2Extension?.message ||
-      n.ephemeralMessage?.message;
+      n.ephemeralMessage?.message
   }
-  return n;
+  return n
 }
 
-// ===========================
-// Detectar módulo de Baileys
-// ===========================
 function ensureWA(wa, conn) {
-  if (wa && typeof wa.downloadContentFromMessage === "function") return wa;
-  if (conn?.wa && typeof conn.wa.downloadContentFromMessage === "function") return conn.wa;
-  if (global.wa && typeof global.wa.downloadContentFromMessage === "function") return global.wa;
-  return null;
+  if (wa?.downloadContentFromMessage) return wa
+  if (conn?.wa?.downloadContentFromMessage) return conn.wa
+  if (global.wa?.downloadContentFromMessage) return global.wa
+  return null
 }
 
-// ===========================
-//        HANDLER
-// ===========================
-const handler = async (msg, { conn, command, wa }) => {
-  const chatId = msg.key.remoteJid;
-  const pref = global.prefixes?.[0] || ".";
+const handler = async (msg, { conn, command, wa, usedPrefix }) => {
+  const chatId = msg.key.remoteJid
+  const pref = usedPrefix || global.prefixes?.[0] || "."
+  const ctx = msg.message?.extendedTextMessage?.contextInfo
+  const quotedRaw = ctx?.quotedMessage
+  const quoted = quotedRaw ? unwrapMessage(quotedRaw) : null
+  const mime = quoted?.imageMessage?.mimetype || ""
 
-  const ctx = msg.message?.extendedTextMessage?.contextInfo;
-  const quotedRaw = ctx?.quotedMessage;
-  const quoted = quotedRaw ? unwrapMessage(quotedRaw) : null;
-
-  if (!quoted?.imageMessage) {
+  if (!mime || !/image\/(jpe?g|png)/i.test(mime)) {
+    await conn.sendMessage(chatId, { react: { text: "🔥", key: msg.key } })
     return conn.sendMessage(
       chatId,
       {
-        text: `✳️ *Usa:*\n${pref}${command}\n📌 Responde a una *imagen* para mejorarla.`,
+        text: `Envía o responde a una imagen con:\n${pref + command}`,
+        ...global.rcanal
       },
       { quoted: msg }
-    );
+    )
   }
 
   try {
-    await conn.sendMessage(chatId, { react: { text: "🧪", key: msg.key } });
-  } catch {}
+    await conn.sendMessage(chatId, { react: { text: "⚡", key: msg.key } })
 
-  const WA = ensureWA(wa, conn);
-  if (!WA) {
-    try {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-    } catch {}
-    return conn.sendMessage(
-      chatId,
-      { text: "❌ *Error interno:* downloader no disponible (inyecta `wa` en index.js)." },
-      { quoted: msg }
-    );
-  }
-
-  const tmpDir = path.join(__dirname, "tmp");
-  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-
-  let tmpFile = null;
-
-  try {
-    // -------------------
-    // 1) Descargar imagen
-    // -------------------
-    const imgNode = quoted.imageMessage;
-    const stream = await WA.downloadContentFromMessage(imgNode, "image");
-    const ext = (imgNode.mimetype?.split("/")[1] || "jpg").replace(/^x-/, "");
-    tmpFile = path.join(tmpDir, `${Date.now()}_hd.${ext}`);
-
-    const ws = fs.createWriteStream(tmpFile);
-    for await (const chunk of stream) ws.write(chunk);
-    await new Promise((r) => ws.end(r));
-
-    // -------------------
-    // 2) Subir al CDN
-    // -------------------
-    const form = new FormData();
-    form.append("file", fs.createReadStream(tmpFile));
-
-    const up = await axios.post("https://cdn.russellxz.click/upload.php", form, {
-      headers: form.getHeaders(),
-      timeout: 30000,
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
-      validateStatus: (s) => s >= 200 && s < 500,
-    });
-
-    const imageUrl =
-      up?.data?.url ||
-      up?.data?.data?.url ||
-      up?.data?.result?.url ||
-      null;
-
-    if (!imageUrl) {
-      throw new Error("No se obtuvo URL del CDN (upload).");
-    }
-
-    // -------------------
-    // 3) Llamar API Remini
-    // -------------------
-    const API_KEY = "russellxz"; // tu key
-    const REMINI_URL = "https://api.neoxr.eu/api/remini";
-
-    const rem = await axios.get(
-      `${REMINI_URL}?image=${encodeURIComponent(imageUrl)}&apikey=${API_KEY}`,
-      {
-        timeout: 45000,
-        validateStatus: (s) => s >= 200 && s < 500,
-      }
-    );
-
-    const enhancedUrl =
-      rem?.data?.data?.url ||
-      rem?.data?.result?.url ||
-      rem?.data?.url ||
-      null;
-
-    if (!rem?.data?.status || !enhancedUrl) {
-      throw new Error(rem?.data?.message || "La API no devolvió una imagen mejorada.");
-    }
-
-    // -------------------
-    // 4) Enviar la imagen
-    // -------------------
     await conn.sendMessage(
       chatId,
       {
-        image: { url: enhancedUrl },
+        text: "Mejorando la calidad de la imagen, espera un momento...",
+        ...global.rcanal
+      },
+      { quoted: msg }
+    )
+
+    const WA = ensureWA(wa, conn)
+    if (!WA) {
+      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } })
+      return conn.sendMessage(
+        chatId,
+        { text: "Error interno: no se encontró el módulo de descarga.", ...global.rcanal },
+        { quoted: msg }
+      )
+    }
+
+    const stream = await WA.downloadContentFromMessage(quoted.imageMessage, "image")
+    const buffer = []
+    for await (const chunk of stream) buffer.push(chunk)
+    const media = Buffer.concat(buffer)
+
+    const ext = mime.split("/")[1]
+    const filename = `image_${Date.now()}.${ext}`
+
+    const form = new FormData()
+    form.append("image", media, { filename, contentType: mime })
+    form.append("scale", "2")
+
+    const headers = {
+      ...form.getHeaders(),
+      accept: "application/json",
+      "x-client-version": "web",
+      "x-locale": "es"
+    }
+
+    const res = await fetch("https://api2.pixelcut.app/image/upscale/v1", {
+      method: "POST",
+      headers,
+      body: form
+    })
+
+    const json = await res.json()
+
+    if (!json?.result_url || !json.result_url.startsWith("http")) {
+      throw new Error("No se pudo obtener la imagen mejorada desde Pixelcut.")
+    }
+
+    const resultBuffer = await (await fetch(json.result_url)).buffer()
+
+    await conn.sendMessage(
+      chatId,
+      {
+        image: resultBuffer,
         caption: "",
+        ...global.rcanal
       },
       { quoted: msg }
-    );
+    )
 
-    try {
-      await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
-    } catch {}
-
-  } catch (e) {
-    console.error("❌ Error en .hd:", e);
-    try {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-    } catch {}
+    await conn.sendMessage(chatId, { react: { text: "👑", key: msg.key } })
+  } catch (err) {
+    await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } })
     await conn.sendMessage(
       chatId,
-      { text: `❌ *Error:* ${e?.message || "Fallo desconocido."}` },
+      {
+        text: `Falló la mejora de imagen:\n${err.message}`,
+        ...global.rcanal
+      },
       { quoted: msg }
-    );
-  } finally {
-    if (tmpFile) {
-      try {
-        fs.unlinkSync(tmpFile);
-      } catch {}
-    }
+    )
   }
-};
+}
 
-handler.command = ["de"];
-handler.help = ["de"];
-handler.tags = ["tools"];
+handler.help = ["hd"]
+handler.tags = ["tools"]
+handler.command = ["de"]
 
-export default handler;
+export default handler
