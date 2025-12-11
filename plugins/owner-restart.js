@@ -1,11 +1,12 @@
 let handler = async (m, { conn }) => {
     try {
-        // Asegurar que fs exista (sin imports)
-        const fs = global.fs || require("fs");
+        // Cargar fs en ESM SIN imports arriba
+        const fs = (await import("fs")).default;
 
+        // Enviar mensaje de reinicio
         let msg = await conn.reply(m.chat, "🔄 Reiniciando el bot…", m);
 
-        // Guardar info del mensaje para editar después
+        // Guardar datos para editar después
         const data = {
             chat: m.chat,
             msgId: msg.key.id
@@ -13,10 +14,11 @@ let handler = async (m, { conn }) => {
 
         fs.writeFileSync("./last-restart.json", JSON.stringify(data));
 
+        // Reiniciar
         setTimeout(() => process.exit(0), 1500);
 
     } catch (error) {
-        console.log(error);
+        console.error(error);
         conn.reply(m.chat, String(error), m);
     }
 };
