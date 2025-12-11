@@ -1,29 +1,20 @@
-let handler = async (m, { conn }) => {
-    try {
-        // Cargar fs en ESM SIN imports arriba
-        const fs = (await import("fs")).default;
+const handler = async (m, { conn, isROwner, text }) => {
+const datas = global
 
-        // Enviar mensaje de reinicio
-        let msg = await conn.reply(m.chat, "🔄 Reiniciando el bot…", m);
+if (!process.send) throw 'Dont: node main.js\nDo: node index.js'
+const { key } = await conn.sendMessage(m.chat, {text: `🚀🚀`}, {quoted: m})
+await delay(1000 * 1)
+await conn.sendMessage(m.chat, {text: `🚀🚀🚀🚀`, edit: key})
+await delay(1000 * 1)
+await conn.sendMessage(m.chat, {text: `🚀🚀🚀🚀🚀🚀`, edit: key})
+await conn.sendMessage(m.chat, {text: `𝙍𝙚𝙞𝙣𝙞𝙘𝙞𝙖𝙧 | 𝙍𝙚𝙨𝙩𝙖𝙧𝙩`, edit: key})
+//process.send('reset')
+process.exit(0); 
+}
+handler.help = ['restart'] 
+handler.tags = ['owner']
+handler.command = ['restart','reiniciar'] 
+handler.owner = true
+export default handler
 
-        // Guardar datos para editar después
-        const data = {
-            chat: m.chat,
-            msgId: msg.key.id
-        };
-
-        fs.writeFileSync("./last-restart.json", JSON.stringify(data));
-
-        // Reiniciar
-        setTimeout(() => process.exit(0), 1500);
-
-    } catch (error) {
-        console.error(error);
-        conn.reply(m.chat, String(error), m);
-    }
-};
-
-handler.command = ['rei', 'restart'];
-handler.rowner = true;
-
-export default handler;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
