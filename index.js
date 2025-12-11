@@ -419,44 +419,80 @@ if (readBotPath.includes(creds)) {
 yukiJadiBot({pathYukiJadiBot: botPath, m: null, conn, args: '', usedPrefix: '/', command: 'serbot'})
 }}}}
 
-const pluginFolder = global.__dirname(join(__dirname, './plugins/index'))
-const pluginFilter = (filename) => /\.js$/.test(filename)
-global.plugins = {}
-async function filesInit() {
-for (const filename of readdirSync(pluginFolder).filter(pluginFilter)) {
-try {
-const file = global.__filename(join(pluginFolder, filename))
-const module = await import(file)
-global.plugins[filename] = module.default || module
-} catch (e) {
-conn.logger.error(e)
-delete global.plugins[filename]
-}}}
-filesInit().then((_) => Object.keys(global.plugins)).catch(console.error)
+const pluginRoot = join(__dirname, "./plugins/");
+const pluginFilter = (filename) => filename.endsWith(".js");
 
-global.reload = async (_ev, filename) => {
-if (pluginFilter(filename)) {
-const dir = global.__filename(join(pluginFolder, filename), true);
-if (filename in global.plugins) {
-if (existsSync(dir)) conn.logger.info(` updated plugin - '${filename}'`)
-else {
-conn.logger.warn(`deleted plugin - '${filename}'`)
-return delete global.plugins[filename]
-}} else conn.logger.info(`new plugin - '${filename}'`)
-const err = syntaxerror(readFileSync(dir), filename, {
-sourceType: 'module',
-allowAwaitOutsideFunction: true,
-});
-if (err) conn.logger.error(`syntax error while loading '${filename}'\n${format(err)}`)
-else {
-try {
-const module = (await import(`${global.__filename(dir)}?update=${Date.now()}`));
-global.plugins[filename] = module.default || module;
-} catch (e) {
-conn.logger.error(`error require plugin '${filename}\n${format(e)}'`)
-} finally {
-global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)))
-}}}}
+global.plugins = {};
+
+function getAllPluginFiles(dir) {
+  let results = [];
+  for (const file of readdirSync(dir)) {
+    const fullPath = join(dir, file);
+    const isDir = statSync(fullPath).isDirectory();
+    if (isDir) {
+      results = results.concat(getAllPluginFiles(fullPath));
+    } else if (pluginFilter(file)) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+async function filesInit() {
+  for (const fullPath of getAllPluginFiles(pluginRoot)) {
+    try {
+      const module = await import(`${path.resolve(fullPath)}?update=${Date.now()}`);
+      const keyName = fullPath.replace(pluginRoot, "");
+      global.plugins[keyName] = module.default || module;
+    } catch (e) {
+      console.error("Error cargando plugin:", e);
+    }
+  }
+
+  global.plugins = Object.fromEntries(
+    Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
+  );
+}
+
+filesInit().then(() => {
+  console.log("Plugins cargados:", Object.keys(global.plugins).length);
+}).catch(console.error);
+
+global.reload = async (_ev, file) => {
+  if (!file.endsWith(".js")) return;
+
+  const fullPath = path.resolve(join(pluginRoot, file));
+
+  if (!existsSync(fullPath)) {
+    console.log(`❌ Plugin eliminado: ${file}`);
+    delete global.plugins[file];
+    return;
+  }
+
+  console.log(`🔄 Plugin actualizado: ${file}`);
+
+  const err = syntaxerror(readFileSync(fullPath), file, {
+    sourceType: "module",
+    allowAwaitOutsideFunction: true,
+  });
+
+  if (err) {
+    console.error(`❌ Error de sintaxis en ${file}\n${format(err)}`);
+    return;
+  }
+
+  try {
+    const module = await import(`${fullPath}?update=${Date.now()}`);
+    global.plugins[file] = module.default || module;
+    console.log(`✅ Recargado: ${file}`);
+  } catch (e) {
+    console.error(`❌ Error recargando ${file}:`, e);
+  }
+
+  global.plugins = Object.fromEntries(
+    Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
+  );
+};
 Object.freeze(global.reload)
 watch(pluginFolder, global.reload)
 await global.reloadHandler()
