@@ -149,7 +149,7 @@ const handler = async (msg, { conn, command, wa }) => {
       chatId,
       {
         image: { url: enhancedUrl },
-        caption: "✨ Imagen mejorada con éxito por *La Suki Bot*",
+        caption: "",
       },
       { quoted: msg }
     );
