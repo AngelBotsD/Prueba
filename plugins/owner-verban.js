@@ -1,76 +1,46 @@
-// plugins/react.js — versión ESM
+// plugins/react.js — ESM optimizado
 import fetch from "node-fetch";
 
 const handler = async (msg, { conn, text, args }) => {
-  const chatId = msg.key.remoteJid;
-  const raw = (text && text.trim()) || (args || []).join(" ").trim();
+  const chat = msg.key.remoteJid;
+  const raw = (text || args.join(" ")).trim();
 
   if (!raw) {
     return conn.sendMessage(
-      chatId,
+      chat,
       {
         text:
           "👻 Uso: .react <link_post> <emoji1,emoji2,emoji3,emoji4>\n\n" +
-          "Ejemplo:\n.rc https://whatsapp.com/channel/0029Vb6D6ogBVJl60Yr8YL31/473 😨,🤣,👾,😳",
+          "Ejemplo:\n.rc https://whatsapp.com/channel/xxx/123 😨,🤣,👾,😳",
       },
       { quoted: msg }
     );
   }
 
-  // reacción de “procesando…”
-  await conn.sendMessage(chatId, { react: { text: "⏳", key: msg.key } });
+  await conn.sendMessage(chat, { react: { text: "⏳", key: msg.key } });
 
   try {
-    const sp = raw.indexOf(" ");
-    const postLink = sp === -1 ? raw : raw.slice(0, sp).trim();
-    const reactsStr = sp === -1 ? "" : raw.slice(sp + 1).trim();
-
-    if (!postLink || !reactsStr) {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-      return conn.sendMessage(
-        chatId,
-        { text: "⚠️ Formato incorrecto.\n\nUso: .rc <link_post> <emoji1,emoji2,emoji3,emoji4>" },
-        { quoted: msg }
-      );
-    }
-
-    if (!/whatsapp\.com\/channel\//i.test(postLink)) {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-      return conn.sendMessage(
-        chatId,
-        { text: "🚫 El link debe ser de una publicación de *canal de WhatsApp*." },
-        { quoted: msg }
-      );
-    }
-
-    const emojiArray = reactsStr
+    const [postLink, ...rest] = raw.split(" ");
+    const emojiArray = rest.join(" ")
       .split(/[,，]/)
-      .map((e) => e.trim())
+      .map((x) => x.trim())
       .filter(Boolean);
 
-    if (emojiArray.length === 0) {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-      return conn.sendMessage(
-        chatId,
-        { text: "⚠️ Debes indicar al menos 1 emoji." },
-        { quoted: msg }
-      );
-    }
+    // Validaciones rápidas
+    if (!/whatsapp\.com\/channel\//i.test(postLink))
+      return fail("🚫 Link inválido, debe ser un post de canal.");
 
-    if (emojiArray.length > 4) {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-      return conn.sendMessage(
-        chatId,
-        { text: "❗ Máximo 4 emojis permitidos." },
-        { quoted: msg }
-      );
-    }
+    if (!emojiArray.length)
+      return fail("⚠️ Escribe mínimo 1 emoji.");
+
+    if (emojiArray.length > 4)
+      return fail("❗ Máximo 4 emojis permitidos.");
 
     const apiKey =
       process.env.REACT_API_KEY ||
       "42699f4385a23f089abfd6948dd6ff366db8aef340eab58f69839b885b8b5e75";
 
-    const requestData = {
+    const body = {
       post_link: postLink,
       reacts: emojiArray.join(","),
     };
@@ -80,44 +50,37 @@ const handler = async (msg, { conn, text, args }) => {
       {
         method: "POST",
         headers: {
-          Accept: "application/json, text/plain, */*",
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
-          "User-Agent":
-            "Mozilla/5.0 (Android 13; Mobile; rv:146.0) Gecko/146.0 Firefox/146.0",
-          Referer: "https://asitha.top/channel-manager",
         },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify(body),
       }
     );
 
-    const result = await response.json().catch(() => ({}));
+    const json = await response.json().catch(() => ({}));
 
-    if (response.ok && (result?.message || result?.success)) {
-      await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
-      await conn.sendMessage(
-        chatId,
-        { text: "✅ Reacciones enviadas con éxito 👻" },
-        { quoted: msg }
-      );
-    } else {
-      await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-      await conn.sendMessage(
-        chatId,
-        {
-          text:
-            "❌ Error al enviar las reacciones.\n" +
-            (result?.error || result?.message || ""),
-        },
-        { quoted: msg }
-      );
+    if (!response.ok || (!json?.success && !json?.message))
+      return fail("❌ No se pudieron enviar las reacciones.");
+
+    // OK ✔
+    await conn.sendMessage(chat, { react: { text: "✅", key: msg.key } });
+    return conn.sendMessage(
+      chat,
+      { text: "✅ Reacciones enviadas con éxito 👻" },
+      { quoted: msg }
+    );
+
+    // Función compacta de error
+    function fail(msgText) {
+      conn.sendMessage(chat, { react: { text: "❌", key: msg.key } });
+      return conn.sendMessage(chat, { text: msgText }, { quoted: msg });
     }
-  } catch (err) {
-    console.error("[react] Error:", err);
-    await conn.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-    await conn.sendMessage(
-      chatId,
-      { text: "⚠️ Ocurrió un error al procesar la solicitud." },
+  } catch (e) {
+    console.error("[react-opt] Error:", e);
+    conn.sendMessage(chat, { react: { text: "❌", key: msg.key } });
+    return conn.sendMessage(
+      chat,
+      { text: "⚠️ Ocurrió un error inesperado." },
       { quoted: msg }
     );
   }
