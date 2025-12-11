@@ -363,7 +363,31 @@ isInit = true
 }
 if (!isInit) {
 conn.ev.off('messages.upsert', conn.handler)
-conn.ev.off('connection.update', conn.connectionUpdate)
+conn.ev.off('connection.update', 
+conn.connectionUpdate)
+// === REINICIO: EDITAR MENSAJE DESPUÉS DE RECONEXIÓN ===
+conn.ev.on("connection.update", async (update) => {
+    if (update.connection === "open") {
+
+        const tempFile = "./last-restart.json";
+
+        if (fs.existsSync(tempFile)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(tempFile));
+
+                await conn.sendMessage(data.chat, {
+                    edit: data.msgId,
+                    text: "✔️ Nuevamente en línea tras el reinicio"
+                });
+
+                fs.unlinkSync(tempFile);
+
+            } catch (e) {
+                console.error("Error editando mensaje tras reinicio:", e);
+            }
+        }
+    }
+});
 conn.ev.off('creds.update', conn.credsUpdate)
 }
 conn.handler = handler.handler.bind(global.conn)
