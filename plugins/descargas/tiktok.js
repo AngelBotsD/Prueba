@@ -20,11 +20,24 @@ async function getTikTok(url) {
       signal: controller.signal
     });
 
-    const data = await res.json();
+    const raw = await res.text();
+
+    if (raw.startsWith("<")) {
+      throw new Error("La API devolvió HTML o está caída.");
+    }
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new Error("La API devolvió un JSON inválido.");
+    }
+
     if (!res.ok) throw new Error(`HTTP ${res.status} - ${data?.error || "Error desconocido"}`);
     if (data.status !== "true" || !data.data?.video) throw new Error(data?.error || "La API no devolvió video.");
 
     return data.data;
+
   } finally {
     clearTimeout(timeout);
   }
@@ -67,20 +80,19 @@ const handler = async (msg, { conn, args, command }) => {
 ✦ 𝗧𝗶́𝘁𝘂𝗹𝗼: ${title}
 ✦ 𝗔𝘂𝘁𝗼𝗿: ${author}
 ✦ 𝗗𝘂𝗿𝗮𝗰𝗶𝗼́𝗻: ${dur}
-✦ 𝗟𝗶𝗸𝗲𝘀: ${likes}  •  𝗖𝗼𝗺𝗲𝗻𝘁𝗮𝗿𝗶𝗼𝘀: ${comments}
-`;
+✦ 𝗟𝗶𝗸𝗲𝘀: ${likes}  • 𝗖𝗼𝗺𝗲𝗻𝘁𝗮𝗿𝗶𝗼𝘀: ${comments}
 
-    // 🔥 ENVÍO DIRECTO DEL VIDEO
+🤖 𝙎𝙪𝙠𝙞 𝘽𝙤𝙩`;
+
     await conn.sendMessage(chatId, { 
-      video: { url: video }, 
+      video: { url: video },
       mimetype: "video/mp4",
-      caption 
+      caption
     }, { quoted: msg });
 
     await conn.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
 
   } catch (err) {
-    console.error("❌ Error en TikTok:", err);
     await conn.sendMessage(chatId, { 
       text: `❌ Error: ${err?.message || "No se pudo descargar."}` 
     }, { quoted: msg });
