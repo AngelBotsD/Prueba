@@ -380,26 +380,6 @@ const chats = Object.entries(conn.chats).filter(([jid, chat]) => !jid.endsWith('
 conn.ev.on('messages.upsert', conn.handler)
 conn.ev.on('connection.update', conn.connectionUpdate)
 conn.ev.on('creds.update', conn.credsUpdate)
-// === EDITAR MENSAJE AL VOLVER DEL REINICIO ===
-try {
-    const fs = (await import("fs")).default;
-
-    if (fs.existsSync("./last-restart.json")) {
-        const raw = fs.readFileSync("./last-restart.json");
-        const data = JSON.parse(raw);
-
-        if (data?.chat && data?.msgId) {
-            await conn.sendMessage(data.chat, {
-                edit: data.msgId,
-                text: "✅ Nuevamente en línea tras el reinicio"
-            });
-
-            fs.unlinkSync("./last-restart.json");
-        }
-    }
-} catch (e) {
-    console.error("Error editando mensaje tras reinicio:", e);
-}
 isInit = false
 return true
 }
