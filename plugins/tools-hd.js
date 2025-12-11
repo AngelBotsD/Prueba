@@ -56,13 +56,13 @@ const handler = async (msg, { conn, command, wa, usedPrefix }) => {
   if (!mime || !/image\/(jpe?g|png)/i.test(mime)) {
     await conn.sendMessage(chatId, { react: { text: "🔥", key: msg.key } })
     return conn.sendMessage(
-      chatId,
-      {
-        text: `Envía o responde a una imagen con:\n${pref + command}`
-      },
-      { quoted: msg }
-    )
-  }
+  chatId,
+  {
+    text: `Envía o responde a una imagen con:\n${pref + command}`,
+    ...global.rcanal
+  },
+  { quoted: msg }
+)
 
   try {
     await conn.sendMessage(chatId, { react: { text: "⚡", key: msg.key } })
