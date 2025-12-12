@@ -19,7 +19,7 @@ let handler = async (m, { conn }) => {
       desc: `𝖢𝗋𝖾𝖺𝖽𝗈𝗋 𝗒 𝖣𝖾𝗌𝖺𝗋𝗋𝗈𝗅𝗅𝖺𝖽𝗈𝗋 𝖯𝗋𝗂𝗇𝖼𝗂𝗉𝖺𝗅 𝖣𝖾 𝖠𝗇𝗀𝖾𝗅 𝖡𝗈𝗍 👑`,
       image: 'https://cdn.russellxz.click/b1af0aef.jpeg',
       buttons: [
-        { name: 'WhatsApp', url: 'https://wa.me/5521959197313' }
+        { name: 'WhatsApp', url: 'https://wa.me/5215911153853' }
       ]
     },
     {
