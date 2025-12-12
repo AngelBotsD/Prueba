@@ -32,6 +32,31 @@ function ensureWA(wa, conn) {
   return null
 }
 
+function findMedia(msg) {
+  if (!msg) return null
+  if (msg.imageMessage) return { type: 'image', media: msg.imageMessage }
+  if (msg.videoMessage) return { type: 'video', media: msg.videoMessage }
+  if (msg.stickerMessage) return { type: 'sticker', media: msg.stickerMessage }
+  if (msg.audioMessage) return { type: 'audio', media: msg.audioMessage }
+
+  const ctx = msg.extendedTextMessage?.contextInfo
+  if (ctx?.quotedMessage) {
+    const q = unwrapMessage(ctx.quotedMessage)
+    return findMedia(q)
+  }
+
+  if (ctx?.thumbnail) {
+    return {
+      type: 'image',
+      media: {
+        mimetype: 'image/jpeg',
+        jpegThumbnail: ctx.thumbnail
+      }
+    }
+  }
+  return null
+}
+
 function extFromMime(mime, fallback = 'bin') {
   if (!mime) return fallback
   const m = mime.toLowerCase()
@@ -65,11 +90,10 @@ const handler = async (msg, { conn, command, wa }) => {
   const chatId = msg.key.remoteJid
   const pref = global.prefixes?.[0] || "."
 
-  const ctx = msg.message?.extendedTextMessage?.contextInfo
-  const rawQuoted = ctx?.quotedMessage
-  const quoted = rawQuoted ? unwrapMessage(rawQuoted) : null
+  const baseMsg = unwrapMessage(msg.message)
+  const detected = findMedia(baseMsg)
 
-  if (!quoted) {
+  if (!detected) {
     return conn.sendMessage(chatId, {
       text: `✳️ Usa:\n${pref}${command}\nResponde a una imagen, video, sticker o audio.`
     }, { quoted: msg })
@@ -77,79 +101,36 @@ const handler = async (msg, { conn, command, wa }) => {
 
   await conn.sendMessage(chatId, { react: { text: '☁️', key: msg.key } })
 
-  let tmpMade = false
   let rawPath = null
   let finalPath = null
 
   try {
-    let typeDetected = null
-    let mediaMessage = null
-
-    if (quoted.imageMessage) {
-      typeDetected = 'image'
-      mediaMessage = quoted.imageMessage
-    } else if (quoted.videoMessage) {
-      typeDetected = 'video'
-      mediaMessage = quoted.videoMessage
-    } else if (quoted.stickerMessage) {
-      typeDetected = 'sticker'
-      mediaMessage = quoted.stickerMessage
-    } else if (quoted.audioMessage) {
-      typeDetected = 'audio'
-      mediaMessage = quoted.audioMessage
-    } else {
-      throw new Error("Solo se permiten imágenes, videos, stickers o audios.")
-    }
-
     const WA = ensureWA(wa, conn)
     if (!WA) throw new Error("No se pudo acceder a Baileys.")
 
     const tmpDir = path.join(__dirname, 'tmp')
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true })
-    tmpMade = true
 
-    const rawExt = typeDetected === 'sticker'
+    const ext = detected.type === 'sticker'
       ? 'webp'
-      : extFromMime(
-          mediaMessage.mimetype,
-          typeDetected === 'image'
-            ? 'jpg'
-            : typeDetected === 'video'
-            ? 'mp4'
-            : typeDetected === 'audio'
-            ? 'mp3'
-            : 'bin'
-        )
+      : extFromMime(detected.media.mimetype, detected.type === 'image' ? 'jpg' : detected.type)
 
-    rawPath = path.join(tmpDir, `${Date.now()}_input.${rawExt}`)
-    const stream = await WA.downloadContentFromMessage(
-      mediaMessage,
-      typeDetected === 'sticker' ? 'sticker' : typeDetected
-    )
-    const ws = fs.createWriteStream(rawPath)
-    for await (const chunk of stream) ws.write(chunk)
-    ws.end()
-    await new Promise(r => ws.on('finish', r))
+    rawPath = path.join(tmpDir, `${Date.now()}_input.${ext}`)
 
-    const stats = fs.statSync(rawPath)
-    if (stats.size > 200 * 1024 * 1024) {
-      throw new Error('El archivo excede 200MB.')
+    if (detected.media.jpegThumbnail) {
+      fs.writeFileSync(rawPath, detected.media.jpegThumbnail)
+    } else {
+      const stream = await WA.downloadContentFromMessage(
+        detected.media,
+        detected.type === 'sticker' ? 'sticker' : detected.type
+      )
+      const ws = fs.createWriteStream(rawPath)
+      for await (const chunk of stream) ws.write(chunk)
+      ws.end()
+      await new Promise(r => ws.on('finish', r))
     }
 
     finalPath = rawPath
-
-    if (typeDetected === 'audio' && ['ogg', 'm4a', 'opus', 'aac', 'wav', 'amr'].includes(rawExt)) {
-      finalPath = path.join(tmpDir, `${Date.now()}_converted.mp3`)
-      await new Promise((resolve, reject) => {
-        ffmpeg(rawPath)
-          .audioCodec('libmp3lame')
-          .toFormat('mp3')
-          .on('end', resolve)
-          .on('error', reject)
-          .save(finalPath)
-      })
-      try { fs.unlinkSync(rawPath) } catch {}
-    }
 
     const form = new FormData()
     form.append('file', fs.createReadStream(finalPath))
@@ -160,7 +141,7 @@ const handler = async (msg, { conn, command, wa }) => {
       maxBodyLength: Infinity
     })
 
-    if (!res.data?.url) throw new Error('No se pudo subir el archivo.')
+    if (!res.data?.url) throw new Error('No se pudo subir.')
 
     await conn.sendMessage(chatId, {
       text: `✅ Archivo subido:\n${res.data.url}`
