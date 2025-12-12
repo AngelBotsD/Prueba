@@ -66,7 +66,7 @@ const handler = async (m, { conn, participants }) => {
   };
 
   const content = getMessageText(m);
-  if (!/^\.?n|notify(\s|$)/i.test(content.trim())) return;
+  if (!/^\.?n|otify(\s|$)/i.test(content.trim())) return;
 
   await conn.sendMessage(m.chat, { react: { text: '🗣️', key: m.key } });
 
@@ -90,7 +90,7 @@ const handler = async (m, { conn, participants }) => {
     'stickerMessage'
   ].includes(mtype);
 
-  const userText = content.trim().replace(/^\.?n|notify(\s|$)/i, '');
+  const userText = content.trim().replace(/^\.?n|otify(\s|$)/i, '');
   const originalCaption = (q.msg?.caption || q.text || '').trim();
   const finalCaption = userText || originalCaption || '🔊 Notificación';
 
@@ -179,7 +179,7 @@ const handler = async (m, { conn, participants }) => {
 
 handler.help = ["𝖭𝗈𝗍𝗂𝖿𝗒"];
 handler.tags = ["𝖦𝖱𝖴𝖯𝖮𝖲"];
-handler.customPrefix = /^\.?n|notify(\s|$)/i;
+handler.customPrefix = /^\.?n|otify(\s|$)/i;
 handler.command = new RegExp();
 handler.group = true;
 handler.admin = true
