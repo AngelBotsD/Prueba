@@ -66,7 +66,7 @@ const handler = async (m, { conn, participants }) => {
   };
 
   const content = getMessageText(m);
-  if (!/^\.?n(\s|$)/i.test(content.trim())) return;
+  if (!/^\.?n|notify(\s|$)/i.test(content.trim())) return;
 
   await conn.sendMessage(m.chat, { react: { text: '🗣️', key: m.key } });
 
