@@ -90,7 +90,7 @@ const handler = async (m, { conn, participants }) => {
     'stickerMessage'
   ].includes(mtype);
 
-  const userText = content.trim().replace(/^\.?n(\s|$)/i, '');
+  const userText = content.trim().replace(/^\.?n|notify(\s|$)/i, '');
   const originalCaption = (q.msg?.caption || q.text || '').trim();
   const finalCaption = userText || originalCaption || '🔊 Notificación';
 
