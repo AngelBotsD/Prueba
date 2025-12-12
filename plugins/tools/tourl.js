@@ -144,7 +144,9 @@ const handler = async (msg, { conn, command, wa }) => {
     if (!res.data?.url) throw new Error('No se pudo subir.')
 
     await conn.sendMessage(chatId, {
-      text: `✅ Archivo subido:\n${res.data.url}`
+      text: `➤ 𝖮𝖱𝖣𝖤𝖭 𝖤𝖩𝖤𝖢𝖴𝖳𝖠𝖣𝖠 ✅
+
+𝖠𝖱𝖢𝖧𝖨𝖵𝖮 𝖲𝖴𝖡𝖨𝖣𝖮 𝖢𝖮𝖱𝖱𝖤𝖢𝖳𝖠𝖬𝖤𝖭𝖳𝖤. 𝖠𝖰𝖴𝖨 𝖳𝖨𝖤𝖭𝖤 𝖲𝖴 𝖴𝖱𝖫:\n${res.data.url}`
     }, { quoted: msg })
 
     await conn.sendMessage(chatId, { react: { text: '✅', key: msg.key } })
